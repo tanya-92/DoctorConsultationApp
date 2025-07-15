@@ -2,13 +2,16 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Stethoscope, User, Eye, EyeOff } from "lucide-react"
+import { registerUser } from "@/lib/auth"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -25,9 +28,21 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
   })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const router = useRouter()
+  const { user } = useAuth()
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      router.push("/")
+    }
+  }, [user, router])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+    setError("") // Clear error when user types
 
     // Validate age
     if (field === "age") {
@@ -52,23 +67,33 @@ export default function RegisterPage() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setLoading(true)
+    setError("")
 
     // Basic validation
     if (formData.password !== formData.confirmPassword) {
       setErrors((prev) => ({ ...prev, confirmPassword: "Passwords do not match" }))
+      setLoading(false)
       return
     }
 
     const ageNum = Number.parseInt(formData.age)
     if (ageNum < 5 || ageNum > 100) {
       setErrors((prev) => ({ ...prev, age: "Age must be between 5 and 100" }))
+      setLoading(false)
       return
     }
 
-    // Show success message (no backend logic)
-    alert("Registration successful! You can now login to your account.")
+    try {
+      await registerUser(formData.email, formData.password, formData.fullName, ageNum)
+      router.push("/") // Redirect to home page after successful registration
+    } catch (error: any) {
+      setError(error.message || "Registration failed. Please try again.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -211,8 +236,15 @@ export default function RegisterPage() {
                   {errors.confirmPassword && <p className="text-red-600 text-sm mt-1">{errors.confirmPassword}</p>}
                 </div>
 
-                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg" size="lg">
-                  Register
+                {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{error}</div>}
+
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg disabled:bg-blue-400"
+                  size="lg"
+                >
+                  {loading ? "Registering..." : "Register"}
                 </Button>
 
                 <div className="text-center">

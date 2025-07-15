@@ -22,6 +22,8 @@ import {
   Moon,
   ArrowLeft,
 } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+import { logoutUser } from "@/lib/auth"
 
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -30,6 +32,16 @@ export default function HomePage() {
   const [showGallery, setShowGallery] = useState(false)
   const [serviceScrollPosition, setServiceScrollPosition] = useState(0)
   const servicesRef = useRef<HTMLDivElement>(null)
+
+  const { user, userData } = useAuth()
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser()
+    } catch (error) {
+      console.error("Logout error:", error)
+    }
+  }
 
   const scrollServices = (direction: "left" | "right") => {
     const maxScroll = Math.max(0, services.length - 3)
@@ -132,18 +144,34 @@ export default function HomePage() {
                 <span className="ml-2 hidden md:inline">{darkMode ? "Light Mode" : "Dark Mode"}</span>
               </Button>
 
-              <div className="hidden md:flex items-center space-x-3">
-                <Link href="/login">
-                  <Button variant="outline" className="bg-transparent">
-                    Login
+              {user ? (
+                <div className="hidden md:flex items-center space-x-3">
+                  <span className="text-sm text-gray-600 dark:text-gray-300">
+                    Welcome, {userData?.fullName || user.displayName}
+                  </span>
+                  <Button variant="outline" onClick={handleLogout}>
+                    Logout
                   </Button>
-                </Link>
-                <Link href="/appointment">
-                  <Button className="bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-700 hover:to-teal-700 shadow-lg">
-                    Book Appointment
-                  </Button>
-                </Link>
-              </div>
+                  <Link href="/appointment">
+                    <Button className="bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-700 hover:to-teal-700 shadow-lg">
+                      Book Appointment
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="hidden md:flex items-center space-x-3">
+                  <Link href="/login">
+                    <Button variant="outline" className="bg-transparent">
+                      Login
+                    </Button>
+                  </Link>
+                  <Link href="/appointment">
+                    <Button className="bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-700 hover:to-teal-700 shadow-lg">
+                      Book Appointment
+                    </Button>
+                  </Link>
+                </div>
+              )}
 
               <Button
                 variant="ghost"
@@ -177,11 +205,22 @@ export default function HomePage() {
                   Contact
                 </Link>
                 <div className="flex flex-col space-y-2 pt-3 border-t border-gray-200">
-                  <Link href="/login">
-                    <Button variant="outline" className="w-full bg-transparent">
-                      Login
-                    </Button>
-                  </Link>
+                  {user ? (
+                    <>
+                      <span className="text-sm text-gray-600 dark:text-gray-300">
+                        Welcome, {userData?.fullName || user.displayName}
+                      </span>
+                      <Button variant="outline" onClick={handleLogout} className="w-full bg-transparent">
+                        Logout
+                      </Button>
+                    </>
+                  ) : (
+                    <Link href="/login">
+                      <Button variant="outline" className="w-full bg-transparent">
+                        Login
+                      </Button>
+                    </Link>
+                  )}
                   <Link href="/appointment">
                     <Button className="w-full bg-gradient-to-r from-indigo-600 to-teal-600">Book Appointment</Button>
                   </Link>

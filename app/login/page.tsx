@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,15 +12,28 @@ import { Eye, EyeOff, Mail, Lock } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useEffect } from "react"
 import { ArrowLeft, User, Stethoscope } from "lucide-react"
+import { loginUser } from "@/lib/auth"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
   const { theme, setTheme } = useTheme()
+  const router = useRouter()
+  const { user } = useAuth()
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      router.push("/")
+    }
+  }, [user, router])
 
   const [formData, setFormData] = useState({
     email: "",
@@ -31,18 +45,34 @@ export default function Login() {
       ...prev,
       [field]: value,
     }))
+    setError("") // Clear error when user types
   }
 
   const togglePasswordVisibility = () => {
     setShowPassword((prev) => !prev)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log(`patient login:`, formData)
+    setLoading(true)
+    setError("")
 
-    // Redirect based on user type
-    window.location.href = "/"
+    try {
+      await loginUser(formData.email, formData.password)
+      router.push("/") // Redirect to home page after successful login
+    } catch (error: any) {
+      if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
+        setError("Wrong password, try again.")
+      } else if (error.code === "auth/user-not-found") {
+        setError("No user found with this email.")
+      } else if (error.code === "auth/invalid-email") {
+        setError("Invalid email address.")
+      } else {
+        setError("Login failed. Please try again.")
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -149,6 +179,10 @@ export default function Login() {
                     </div>
                   </div>
 
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{error}</div>
+                  )}
+
                   <div className="flex items-center justify-between">
                     <Link
                       href="/forgot-password"
@@ -161,8 +195,9 @@ export default function Login() {
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-700 hover:to-teal-700 dark:from-indigo-500 dark:to-teal-500 dark:hover:from-indigo-400 dark:hover:to-teal-400"
+                    disabled={loading}
                   >
-                    Sign In as Patient
+                    {loading ? "Signing In..." : "Sign In as Patient"}
                   </Button>
 
                   <div className="text-center">
