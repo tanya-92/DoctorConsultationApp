@@ -24,10 +24,76 @@ import {
   MessageCircle,
 } from "lucide-react"
 import { useTheme } from "next-themes"
+import {
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  onSnapshot,
+  serverTimestamp,
+  doc
+} from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+
+
 
 export default function LiveChat() {
   const [chatStarted, setChatStarted] = useState(false)
   const [message, setMessage] = useState("")
+  const [messages, setMessages] = useState<any[]>([])
+  const [roomId, setRoomId] = useState("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+
+  const [currentUser, setCurrentUser] = useState<any>(null);
+const [roomId, setRoomId] = useState("");
+const [messages, setMessages] = useState<any[]>([]);
+
+const handleSendMessage = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (!message.trim() || !roomId || !currentUser?.email) return;
+
+  const newMessage = {
+    text: message,
+    sender: currentUser.email,
+    timestamp: serverTimestamp()
+  };
+
+  try {
+    await addDoc(collection(db, "chats", roomId, "messages"), newMessage);
+    setMessage(""); // clear input after sending
+  } catch (err) {
+    console.error("Error sending message: ", err);
+  }
+};
+  
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    if (user) {
+      setCurrentUser(user);
+
+      const doctorEmail = "drnitinmishraderma@gmail.com"; 
+      const id = `${user.email}_to_${doctorEmail}`;
+      setRoomId(id);
+
+      const messagesRef = collection(db, "chats", id, "messages");
+      const q = query(messagesRef, orderBy("timestamp"));
+
+      const unsubMessages = onSnapshot(q, (snapshot) => {
+        setMessages(snapshot.docs.map((doc) => doc.data()));
+      });
+
+      return () => unsubMessages(); // clean up message listener
+    }
+  });
+
+  return () => unsubscribe(); // clean up auth listener
+}, []);
+
+
   const [preFormData, setPreFormData] = useState({
     name: "",
     age: "",
@@ -36,16 +102,7 @@ export default function LiveChat() {
     contact: "",
     urgency: "",
   })
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      sender: "system",
-      text: "Welcome to Dr. Nitin Mishra's Live Chat Consultation. Please fill out the pre-consultation form to get started.",
-      timestamp: new Date(),
-    },
-  ])
-  const [isTyping, setIsTyping] = useState(false)
-  const [queuePosition, setQueuePosition] = useState(3)
+  
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
@@ -57,105 +114,7 @@ export default function LiveChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  // Update age validation in handleInputChange
-  const handleInputChange = (field: string, value: string) => {
-    if (field === "age") {
-      const ageNum = Number.parseInt(value)
-      if (value && (ageNum < 5 || ageNum > 100)) {
-        setAgeError("Age must be between 5 and 100")
-      } else {
-        setAgeError("")
-      }
-    }
-    setPreFormData((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const handlePreFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setChatStarted(true)
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: prev.length + 1,
-        sender: "system",
-        text: `Hello ${preFormData.name}! Thank you for providing your information. You are currently #${queuePosition} in the queue. Dr. Nitin Mishra will be with you shortly. Estimated wait time: 8-12 minutes.`,
-        timestamp: new Date(),
-      },
-    ])
-
-    // Simulate queue updates
-    setTimeout(() => {
-      setQueuePosition(2)
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: prev.length + 1,
-          sender: "system",
-          text: "You are now #2 in the queue. Dr. Mishra will be with you in approximately 5-8 minutes.",
-          timestamp: new Date(),
-        },
-      ])
-    }, 30000)
-
-    setTimeout(() => {
-      setQueuePosition(1)
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: prev.length + 1,
-          sender: "system",
-          text: "You're next! Dr. Mishra will join the chat in 2-3 minutes.",
-          timestamp: new Date(),
-        },
-      ])
-    }, 60000)
-
-    setTimeout(() => {
-      setQueuePosition(0)
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: prev.length + 1,
-          sender: "doctor",
-          text: `Hello ${preFormData.name}! I'm Dr. Nitin Mishra. I've reviewed your symptoms regarding ${preFormData.symptoms}. How can I help you today?`,
-          timestamp: new Date(),
-        },
-      ])
-    }, 90000)
-  }
-
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!message.trim()) return
-
-    const newMessage = {
-      id: messages.length + 1,
-      sender: "user",
-      text: message,
-      timestamp: new Date(),
-    }
-
-    setMessages((prev) => [...prev, newMessage])
-    setMessage("")
-    setIsTyping(true)
-
-    // Simulate doctor response
-    setTimeout(() => {
-      setIsTyping(false)
-      const doctorResponse = {
-        id: messages.length + 2,
-        sender: "doctor",
-        text: "Thank you for sharing that information. Based on what you've described, I'd like to ask a few more questions to better understand your condition. Can you tell me when these symptoms first appeared?",
-        timestamp: new Date(),
-      }
-      setMessages((prev) => [...prev, doctorResponse])
-    }, 2000)
-  }
-
+  
   const handleFileUpload = () => {
     fileInputRef.current?.click()
   }
@@ -326,308 +285,128 @@ export default function LiveChat() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50 dark:bg-gray-800/80 dark:border-gray-700">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link href="/">
-                <Button variant="ghost" size="sm" className="group">
-                  <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-                  End Chat
-                </Button>
-              </Link>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-600 rounded-lg flex items-center justify-center">
-                  <MessageCircle className="h-4 w-4 text-white" />
-                </div>
-                <span className="text-lg font-bold text-gray-900 dark:text-gray-100">Live Chat - Dr. Nitin Mishra</span>
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    {/* Header */}
+    <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50 dark:bg-gray-800/80 dark:border-gray-700">
+      <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+        <Link href="/">
+          <Button variant="ghost" size="sm" className="group">
+            <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+            End Chat
+          </Button>
+        </Link>
+        <div className="text-sm text-green-600 dark:text-green-400 font-semibold">Live Chat Active</div>
+      </div>
+    </header>
+
+    <div className="container mx-auto px-4 py-4 h-[calc(100vh-80px)] grid lg:grid-cols-4 gap-4">
+      {/* Chat Section */}
+      <div className="lg:col-span-3 flex flex-col">
+        <Card className="flex-1 flex flex-col bg-white/70 dark:bg-gray-800/70 shadow-xl border-0">
+          {/* Chat Header */}
+          <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-blue-50 dark:from-gray-700 dark:to-gray-700">
+            <div className="flex items-center space-x-3">
+              <img src="/placeholder.svg" className="w-12 h-12 rounded-full" alt="Doctor" />
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">Dr. Nitin Mishra</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">MBBS, MD (Skin & VD)</p>
               </div>
             </div>
+          </CardHeader>
 
-            <div className="flex items-center space-x-2">
-              <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                {queuePosition === 0 ? "Connected" : `Queue #${queuePosition}`}
-              </Badge>
-            </div>
-          </div>
-        </div>
-      </header>
+          {/* Chat Messages */}
+          <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+            {messages.length === 0 && (
+              <p className="text-center text-gray-500 dark:text-gray-400">Please wait until the doctor joins the chat.</p>
+            )}
 
-      <div className="container mx-auto px-4 py-4 h-[calc(100vh-80px)]">
-        <div className="grid lg:grid-cols-4 gap-4 h-full">
-          {/* Chat Area */}
-          <div className="lg:col-span-3 flex flex-col">
-            <Card className="flex-1 flex flex-col bg-white/70 backdrop-blur-sm border-0 shadow-xl dark:bg-gray-800/70 dark:border-gray-700">
-              {/* Chat Header */}
-              <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-blue-50 dark:from-gray-700 dark:to-gray-700">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <img
-                      src="/placeholder.svg?height=48&width=48"
-                      alt="Dr. Nitin Mishra"
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                    <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">Dr. Nitin Mishra</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Dermatologist • MBBS, MD (Skin & VD)</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button variant="outline" size="sm" className="bg-white/50 dark:bg-gray-700/50">
-                      <Phone className="h-4 w-4 mr-2" />
-                      Voice Call
-                    </Button>
-                    <Button variant="outline" size="sm" className="bg-white/50 dark:bg-gray-700/50">
-                      <Video className="h-4 w-4 mr-2" />
-                      Video Call
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-
-              {/* Messages */}
-              <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map((msg) => (
-                  <div key={msg.id} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
-                        msg.sender === "user"
-                          ? "bg-gradient-to-r from-blue-600 to-blue-600 text-white dark:from-blue-400 dark:to-blue-400"
-                          : msg.sender === "doctor"
-                            ? "bg-white border shadow-sm dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100"
-                            : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-                      }`}
-                    >
-                      {msg.sender === "doctor" && (
-                        <div className="flex items-center space-x-2 mb-2">
-                          <img
-                            src="/placeholder.svg?height=24&width=24"
-                            alt="Dr. Nitin Mishra"
-                            className="w-6 h-6 rounded-full"
-                          />
-                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Dr. Nitin Mishra</span>
-                        </div>
-                      )}
-                      <p className="text-sm leading-relaxed">{msg.text}</p>
-                      <p
-                        className={`text-xs mt-2 ${
-                          msg.sender === "user" ? "text-blue-100" : "text-gray-500 dark:text-gray-400"
-                        }`}
-                      >
-                        {msg.timestamp.toLocaleTimeString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-
-                {isTyping && (
-                  <div className="flex justify-start">
-                    <div className="bg-white border shadow-sm px-4 py-3 rounded-lg dark:bg-gray-800 dark:border-gray-700">
-                      <div className="flex items-center space-x-2">
-                        <img
-                          src="/placeholder.svg?height=24&width=24"
-                          alt="Dr. Nitin Mishra"
-                          className="w-6 h-6 rounded-full"
-                        />
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce dark:bg-gray-500"></div>
-                          <div
-                            className="w-2 h-2 bg-gray-400 rounded-full animate-bounce dark:bg-gray-500"
-                            style={{ animationDelay: "0.1s" }}
-                          ></div>
-                          <div
-                            className="w-2 h-2 bg-gray-400 rounded-full animate-bounce dark:bg-gray-500"
-                            style={{ animationDelay: "0.2s" }}
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </CardContent>
-
-              {/* Message Input */}
-              <div className="border-t p-4 bg-white/50 dark:bg-gray-700/50">
-                <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleFileUpload}
-                    className="bg-white/50 dark:bg-gray-800/50"
-                  >
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleFileUpload}
-                    className="bg-white/50 dark:bg-gray-800/50"
-                  >
-                    <ImageIcon className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleFileUpload}
-                    className="bg-white/50 dark:bg-gray-800/50"
-                  >
-                    <Video className="h-4 w-4" />
-                  </Button>
-                  <Input
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Type your message..."
-                    className="flex-1 bg-white/50 dark:bg-gray-800/50 dark:text-gray-100"
-                    disabled={queuePosition > 0}
-                  />
-                  <Button type="submit" size="sm" className="bg-blue-600" disabled={queuePosition > 0}>
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </form>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  accept="image/*,video/*,.pdf,.doc,.docx"
-                  multiple
-                />
-                {queuePosition > 0 && (
-                  <p className="text-sm text-gray-600 mt-2 text-center dark:text-gray-400">
-                    Please wait while you're in the queue. You can type once connected.
+            {messages.map((msg, idx) => (
+              <div key={idx} className={`flex ${msg.sender === currentUser?.email ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${msg.sender === currentUser?.email
+                  ? "bg-gradient-to-r from-blue-600 to-blue-600 text-white"
+                  : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border dark:border-gray-700"
+                }`}>
+                  <p className="text-sm leading-relaxed">{msg.text}</p>
+                  <p className="text-xs mt-1 text-gray-400 dark:text-gray-500">
+                    {msg.timestamp?.toDate?.().toLocaleTimeString?.() ?? ""}
                   </p>
-                )}
+                </div>
               </div>
-            </Card>
+            ))}
+          </CardContent>
+
+          {/* Message Input */}
+          <div className="border-t p-4 bg-white/50 dark:bg-gray-700/50">
+            <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
+              <Button type="button" variant="outline" size="sm" onClick={handleFileUpload}>
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={handleFileUpload}>
+                <ImageIcon className="h-4 w-4" />
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={handleFileUpload}>
+                <Video className="h-4 w-4" />
+              </Button>
+              <Input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Type your message..."
+                className="flex-1"
+              />
+              <Button type="submit" size="sm" className="bg-blue-600 text-white">Send</Button>
+            </form>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept="image/*,video/*,.pdf,.doc,.docx"
+              multiple
+            />
           </div>
+        </Card>
+      </div>
 
-          {/* Sidebar */}
-          <div className="space-y-4">
-            {/* Patient Info */}
-            <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl dark:bg-gray-800/70 dark:border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center space-x-2 dark:text-gray-100">
-                  <User className="h-4 w-4" />
-                  <span>Patient Information</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Name:</span>
-                  <div className="text-gray-900 dark:text-gray-100">{preFormData.name}</div>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Age:</span>
-                  <div className="text-gray-900 dark:text-gray-100">{preFormData.age} years</div>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Gender:</span>
-                  <div className="text-gray-900 capitalize dark:text-gray-100">{preFormData.gender}</div>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Contact:</span>
-                  <div className="text-gray-900 dark:text-gray-100">{preFormData.contact}</div>
-                </div>
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Urgency:</span>
-                  <Badge
-                    variant={
-                      preFormData.urgency === "high"
-                        ? "destructive"
-                        : preFormData.urgency === "medium"
-                          ? "default"
-                          : "secondary"
-                    }
-                    className="ml-2"
-                  >
-                    {preFormData.urgency}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
+      {/* Sidebar with Patient Info + End Button */}
+      <div className="space-y-4">
+        <Card className="bg-white/70 dark:bg-gray-800/70 shadow-xl border-0">
+          <CardHeader>
+            <CardTitle className="text-sm dark:text-gray-100">Patient Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div><b>Name:</b> {preFormData.name}</div>
+            <div><b>Age:</b> {preFormData.age}</div>
+            <div><b>Gender:</b> {preFormData.gender}</div>
+            <div><b>Contact:</b> {preFormData.contact}</div>
+            <div><b>Urgency:</b> {preFormData.urgency}</div>
+          </CardContent>
+        </Card>
 
-            {/* Symptoms */}
-            <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl dark:bg-gray-800/70 dark:border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-sm dark:text-gray-100">Chief Complaint</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-700 leading-relaxed dark:text-gray-300">{preFormData.symptoms}</p>
-              </CardContent>
-            </Card>
+        <Card className="bg-white/70 dark:bg-gray-800/70 shadow-xl border-0">
+          <CardHeader>
+            <CardTitle className="text-sm dark:text-gray-100">Chief Complaint</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-800 dark:text-gray-300">{preFormData.symptoms}</p>
+          </CardContent>
+        </Card>
 
-            {/* Queue Status */}
-            <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl dark:bg-gray-800/70 dark:border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center space-x-2 dark:text-gray-100">
-                  <Clock className="h-4 w-4" />
-                  <span>Queue Status</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center">
-                  {queuePosition === 0 ? (
-                    <>
-                      <div className="text-2xl font-bold text-green-600 mb-2 dark:text-green-400">Connected</div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        You are now chatting with Dr. Nitin Mishra
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-3xl font-bold text-blue-600 mb-2 dark:text-blue-400">#{queuePosition}</div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Position in queue</p>
-                      <p className="text-xs text-gray-500 mt-1 dark:text-gray-400">
-                        Estimated wait: {queuePosition * 3}-{queuePosition * 5} minutes
-                      </p>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Consultation Fee */}
-            <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl dark:bg-gray-800/70 dark:border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-sm dark:text-gray-100">Consultation Fee</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600 mb-2 dark:text-green-400">₹500</div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Payable after consultation</p>
-                  <div className="mt-3 p-2 bg-green-50 rounded-lg dark:bg-green-900">
-                    <p className="text-xs text-green-800 dark:text-green-200">Payment options: UPI, Card, Cash</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl dark:bg-gray-800/70 dark:border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-sm dark:text-gray-100">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" size="sm" className="w-full bg-white/50 dark:bg-gray-800/50">
-                  Request Prescription
-                </Button>
-                <Button variant="outline" size="sm" className="w-full bg-white/50 dark:bg-gray-800/50">
-                  Schedule Follow-up
-                </Button>
-                <Button variant="outline" size="sm" className="w-full bg-white/50 dark:bg-gray-800/50">
-                  End Consultation
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        <Card className="bg-white/70 dark:bg-gray-800/70 shadow-xl border-0">
+          <CardHeader>
+            <CardTitle className="text-sm dark:text-gray-100">Quick Action</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Button variant="destructive" className="w-full">End Consultation</Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
-  )
+  </div>
+);
+
+  {chatStarted && messages.length === 0 && (
+  <p className="text-center text-gray-500 mt-4">
+    Please wait until the doctor joins the chat.
+  </p>
+)}
+
 }
