@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { useRouter } from "next/navigation"; 
 import {
   ArrowLeft,
   Send,
@@ -45,6 +46,7 @@ export default function LiveChat() {
   const [messages, setMessages] = useState<any[]>([])
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [roomId, setRoomId] = useState("");
+  const router = useRouter();
 
   const doctorQuickReplies = [
   "How can I help you?",
@@ -107,7 +109,25 @@ export default function LiveChat() {
   };
 
 
+  const handleCall = async (type: "audio" | "video") => {
+  if (!roomId || !currentUser?.email) return;
+
+  try {
+    const response = await fetch(
+  `https://us-central1-doctor-app-98244.cloudfunctions.net/api/generate-agora-token?channelName=${roomId}&uid=${currentUser.email}&role=publisher`
+  );
+
+    const { token } = await response.json();
+
+    router.push(
+      `/call?channel=${roomId}&uid=${currentUser.email}&token=${token}&type=${type}`
+    );
+  } catch (err) {
+    console.error("Failed to fetch Agora token", err);
+  }
+};
   
+
 useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, (user) => {
     if (user) {
@@ -391,16 +411,25 @@ useEffect(() => {
               ))}
             </div>)}
             
+
             <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
               <Button type="button" variant="outline" size="sm" onClick={handleFileUpload}>
                 <Paperclip className="h-4 w-4" />
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={handleFileUpload}>
-                <ImageIcon className="h-4 w-4" />
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={handleFileUpload}>
-                <Video className="h-4 w-4" />
-              </Button>
+              <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleCall("audio")}>
+            <Phone className="h-4 w-4" />
+            </Button>
+            <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleCall("video")}>
+            <Video className="h-4 w-4" />
+            </Button>
               <Input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
