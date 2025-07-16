@@ -48,27 +48,44 @@ export default function LiveChat() {
 
 
   const [currentUser, setCurrentUser] = useState<any>(null);
-const [roomId, setRoomId] = useState("");
-const [messages, setMessages] = useState<any[]>([]);
+  const [roomId, setRoomId] = useState("");
+  const [messages, setMessages] = useState<any[]>([]);
 
-const handleSendMessage = async (e: React.FormEvent) => {
+  const doctorQuickReplies = [
+  "How can I help you?",
+  "Please elaborate your symptoms.",
+  "I’ll prescribe you a medicine.",
+  "Thank you for your time.",
+  "Do you have any allergies?",
+  ];
+  const patientQuickReplies = [
+  "I have a skin issue.",
+  "Since last week...",
+  "Thank you, Doctor.",
+  "Yes, I have an allergy.",
+  "What should I apply?",
+  ];
+  const currentQuickReplies =
+  currentUser?.email === "drnitinmishraderma@gmail.com" ? doctorQuickReplies : patientQuickReplies;
+  
+  
+  const handleSendMessage = async (e: React.FormEvent) => {
   e.preventDefault();
-
   if (!message.trim() || !roomId || !currentUser?.email) return;
-
   const newMessage = {
     text: message,
     sender: currentUser.email,
     timestamp: serverTimestamp()
   };
-
   try {
     await addDoc(collection(db, "chats", roomId, "messages"), newMessage);
     setMessage(""); // clear input after sending
   } catch (err) {
     console.error("Error sending message: ", err);
   }
-};
+  };
+
+
   
 useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -337,6 +354,22 @@ useEffect(() => {
 
           {/* Message Input */}
           <div className="border-t p-4 bg-white/50 dark:bg-gray-700/50">
+            
+           {/* Quick Reply Buttons (based on role) */}
+          {currentQuickReplies.length > 0 && (
+             <div className="flex flex-wrap gap-2 mb-2">
+              {currentQuickReplies.map((reply, idx) => (
+                <Button
+                  key={idx}
+                  variant="secondary"
+                  size="sm"
+                  className="bg-slate-100 dark:bg-gray-700 dark:text-white text-gray-800 px-3"
+                  onClick={() => setMessage(reply)}>
+                  {reply}
+                </Button>
+              ))}
+            </div>)}
+            
             <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
               <Button type="button" variant="outline" size="sm" onClick={handleFileUpload}>
                 <Paperclip className="h-4 w-4" />
