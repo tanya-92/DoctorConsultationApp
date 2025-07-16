@@ -43,13 +43,8 @@ export default function LiveChat() {
   const [chatStarted, setChatStarted] = useState(false)
   const [message, setMessage] = useState("")
   const [messages, setMessages] = useState<any[]>([])
-  const [roomId, setRoomId] = useState("");
-  const [currentUser, setCurrentUser] = useState<any>(null);
-
-
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [roomId, setRoomId] = useState("");
-  const [messages, setMessages] = useState<any[]>([]);
 
   const doctorQuickReplies = [
   "How can I help you?",
