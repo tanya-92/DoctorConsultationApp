@@ -63,7 +63,33 @@ export default function LiveChat() {
   const currentQuickReplies =
   currentUser?.email === "drnitinmishraderma@gmail.com" ? doctorQuickReplies : patientQuickReplies;
   
-  
+  const handlePreFormSubmit = (e: React.FormEvent) => {
+  e.preventDefault();
+  setChatStarted(true);
+
+  setMessages((prev) => [
+    ...prev,
+    {
+      id: prev.length + 1,
+      sender: "system",
+      text: `Hello ${preFormData.name}! Please wait until Dr. Nitin Mishra joins the chat.`,
+      timestamp: new Date(),
+    },
+  ]);
+};
+  const handleInputChange = (field: string, value: string) => {
+    setPreFormData((prev) => ({ ...prev, [field]: value }));
+    if (field === "age") {
+      // Validate age input
+      const age = parseInt(value, 10);
+      if (isNaN(age) || age < 5 || age > 100) {
+        setAgeError("Please enter a valid age between 5 and 100.");
+      } else {
+        setAgeError("");
+      }
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!message.trim() || !roomId || !currentUser?.email) return;
