@@ -80,7 +80,29 @@ export default function LiveChat() {
   }
   };
 
-
+    setMessages((prev) => [
+    ...prev,
+    {
+      id: prev.length + 1,
+      sender: "system",
+      text: `Hello ${preFormData.name}! Please wait until Dr. Nitin Mishra joins the chat.`,
+      timestamp: new Date(),
+    },
+  ]);
+};
+  const handleInputChange = (field: string, value: string) => {
+    setPreFormData((prev) => ({ ...prev, [field]: value }));
+    if (field === "age") {
+      // Validate age input
+      const age = parseInt(value, 10);
+      if (isNaN(age) || age < 5 || age > 100) {
+        setAgeError("Please enter a valid age between 5 and 100.");
+      } else {
+        setAgeError("");
+      }
+    }
+  };
+  
   
 useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, (user) => {
