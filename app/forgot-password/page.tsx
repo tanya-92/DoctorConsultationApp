@@ -1,138 +1,61 @@
 "use client"
 
-import { useState } from "react"
+import type React from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import {
-  ArrowLeft,
-  Stethoscope,
-  Award,
-  Users,
-  Clock,
-  Shield,
-  Star,
-  CheckCircle,
-  Sun,
-  Moon,
-  GraduationCap,
-  Heart,
-  Zap,
-} from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Mail, ArrowLeft, Stethoscope } from "lucide-react"
+import { useTheme } from "next-themes"
+import { auth } from "@/lib/firebase"
+import { sendPasswordResetEmail } from "firebase/auth"
 
-export default function WhyChooseUs() {
-  const [darkMode, setDarkMode] = useState(false)
+export default function ForgotPassword() {
+  const [mounted, setMounted] = useState(false)
+  const [email, setEmail] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
+  const { theme, setTheme } = useTheme()
+  const router = useRouter()
 
-  const reasons = [
-    {
-      icon: Award,
-      title: "20+ Years of Experience",
-      description: "Two decades of specialized expertise in dermatology, venereology & leprosy treatment",
-      details: [
-        "Extensive experience in complex skin conditions",
-        "Thousands of successful treatments",
-        "Continuous professional development",
-        "Stay updated with latest medical advances",
-      ],
-    },
-    {
-      icon: GraduationCap,
-      title: "MBBS + MD Qualified",
-      description: "Highly qualified with MBBS and MD (Skin & VD) from prestigious medical institutions",
-      details: [
-        "MBBS - Bachelor of Medicine and Surgery",
-        "MD (Skin & VD) - Specialized in Dermatology",
-        "Certified by Medical Council of India",
-        "Regular participation in medical conferences",
-      ],
-    },
-    {
-      icon: Users,
-      title: "Trusted by 5000+ Patients",
-      description: "A large community of satisfied patients who trust our expertise and care",
-      details: [
-        "High patient satisfaction rate",
-        "Long-term patient relationships",
-        "Word-of-mouth referrals",
-        "Diverse patient demographics",
-      ],
-    },
-    {
-      icon: Zap,
-      title: "Modern Equipment & Technology",
-      description: "State-of-the-art medical equipment and latest treatment technologies",
-      details: [
-        "Advanced laser systems",
-        "Modern diagnostic equipment",
-        "Sterile treatment environment",
-        "Latest surgical instruments",
-      ],
-    },
-    {
-      icon: Heart,
-      title: "Personalized Patient Care",
-      description: "Individual attention and customized treatment plans for every patient",
-      details: [
-        "Detailed consultation process",
-        "Customized treatment protocols",
-        "Regular follow-up care",
-        "Patient education and guidance",
-      ],
-    },
-    {
-      icon: Shield,
-      title: "Safe & Effective Treatments",
-      description: "Proven treatment methods with high success rates and minimal side effects",
-      details: [
-        "Evidence-based treatment approaches",
-        "Strict safety protocols",
-        "Minimal invasive procedures",
-        "Comprehensive aftercare support",
-      ],
-    },
-    {
-      icon: Clock,
-      title: "Flexible Timing & Locations",
-      description: "Convenient clinic timings and multiple locations for easy accessibility",
-      details: [
-        "Morning and evening slots available",
-        "Two convenient clinic locations",
-        "Weekend appointments available",
-        "Emergency consultation support",
-      ],
-    },
-    {
-      icon: Star,
-      title: "Comprehensive Skin Solutions",
-      description: "Complete range of dermatological services under one roof",
-      details: [
-        "Medical dermatology treatments",
-        "Cosmetic procedures",
-        "Surgical interventions",
-        "Preventive skin care guidance",
-      ],
-    },
-  ]
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
-  const stats = [
-    { number: "20+", label: "Years Experience" },
-    { number: "5000+", label: "Happy Patients" },
-    { number: "15+", label: "Treatment Types" },
-    { number: "2", label: "Clinic Locations" },
-  ]
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setMessage("")
+    setError("")
+
+    try {
+      // Define the actionCodeSettings for the password reset email
+      const actionCodeSettings = {
+        // URL to redirect to after the user resets their password
+        // This URL must be in the list of authorized domains in your Firebase project settings.
+        url: `${window.location.origin}/login?reset=true`,
+        handleCodeInApp: false, // Set to true if you want to handle the reset within your app (requires more setup)
+      }
+
+      await sendPasswordResetEmail(auth, email, actionCodeSettings)
+      setMessage("If an account with that email exists, a password reset link has been sent to your inbox.")
+      setEmail("") // Clear email input after sending
+    } catch (err: any) {
+      console.error("Password reset error:", err)
+      setError(err.message || "Failed to send password reset email. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <div
-      className={`min-h-screen transition-colors duration-300 ${
-        darkMode ? "dark bg-slate-900" : "bg-gradient-to-br from-slate-50 via-white to-indigo-50"
-      }`}
-    >
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-slate-50 to-teal-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-700">
       {/* Header */}
-      <header
-        className={`sticky top-0 z-50 backdrop-blur-md border-b transition-all duration-300 ${
-          darkMode ? "bg-slate-900/80 border-slate-700" : "bg-white/80 border-slate-200"
-        }`}
-      >
+      <header className="bg-white/80 backdrop-blur-md shadow-sm border-b dark:bg-slate-800/80 dark:border-slate-700">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -142,184 +65,86 @@ export default function WhyChooseUs() {
                   Back to Home
                 </Button>
               </Link>
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-indigo-600 to-teal-600 rounded-xl flex items-center justify-center">
-                  <Stethoscope className="h-5 w-5 text-white" />
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-gradient-to-r from-indigo-600 to-teal-600 rounded-lg flex items-center justify-center">
+                  <Stethoscope className="h-4 w-4 text-white" />
                 </div>
-                <div>
-                  <h1 className={`text-lg font-bold ${darkMode ? "text-white" : "text-slate-900"}`}>Why Choose Us</h1>
-                  <p className="text-sm text-indigo-600">Dr. Nitin Mishra</p>
-                </div>
+                <span className="text-lg font-bold text-gray-900 dark:text-gray-100">Dr. Nitin Mishra</span>
               </div>
             </div>
-
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" onClick={() => setDarkMode(!darkMode)} className="p-2">
-                {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </Button>
-              <Link href="/appointment">
-                <Button className="bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-700 hover:to-teal-700">
-                  Book Appointment
-                </Button>
-              </Link>
-            </div>
+            {mounted && (
+              <select
+                value={theme}
+                onChange={(e) => setTheme(e.target.value)}
+                className="bg-white border rounded px-2 py-1 dark:bg-slate-700 dark:text-white"
+              >
+                <option value="system">System</option>
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
+              </select>
+            )}
           </div>
         </div>
       </header>
 
       <div className="container mx-auto px-4 py-12">
-        {/* Hero Section */}
-        <div className="text-center mb-16">
-          <h1 className={`text-4xl md:text-5xl font-bold mb-6 ${darkMode ? "text-white" : "text-slate-900"}`}>
-            Why Choose Dr. Nitin Mishra?
-          </h1>
-          <p className={`text-xl max-w-3xl mx-auto mb-8 ${darkMode ? "text-slate-300" : "text-slate-600"}`}>
-            Experience excellence in dermatological care with a trusted specialist who combines expertise, compassion,
-            and cutting-edge technology to deliver the best possible outcomes for your skin health.
-          </p>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
-            {stats.map((stat, index) => (
-              <Card
-                key={index}
-                className={`${
-                  darkMode ? "bg-slate-800/50 backdrop-blur-sm" : "bg-white/70 backdrop-blur-sm"
-                } border-0 shadow-lg`}
-              >
-                <CardContent className="p-6 text-center">
-                  <div className={`text-3xl font-bold mb-2 ${darkMode ? "text-white" : "text-slate-900"}`}>
-                    {stat.number}
-                  </div>
-                  <div className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-600"}`}>{stat.label}</div>
-                </CardContent>
-              </Card>
-            ))}
+        <div className="max-w-md mx-auto">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-r from-indigo-600 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Mail className="h-8 w-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2 dark:text-gray-100">Forgot Your Password?</h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Enter your email address below and we'll send you a link to reset your password.
+            </p>
           </div>
-        </div>
 
-        {/* Reasons Grid */}
-        <div className="grid md:grid-cols-2 gap-8 mb-16">
-          {reasons.map((reason, index) => {
-            const IconComponent = reason.icon
-            return (
-              <Card
-                key={index}
-                className={`group hover:shadow-xl transition-all duration-300 border-0 ${
-                  darkMode ? "bg-slate-800/50 backdrop-blur-sm" : "bg-white/70 backdrop-blur-sm"
-                }`}
-              >
-                <CardContent className="p-8">
-                  <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 bg-gradient-to-r from-indigo-100 to-teal-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <IconComponent className="h-6 w-6 text-indigo-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className={`text-xl font-semibold mb-3 ${darkMode ? "text-white" : "text-slate-900"}`}>
-                        {reason.title}
-                      </h3>
-                      <p className={`mb-4 ${darkMode ? "text-slate-300" : "text-slate-600"}`}>{reason.description}</p>
-                      <div className="space-y-2">
-                        {reason.details.map((detail, detailIndex) => (
-                          <div key={detailIndex} className="flex items-center space-x-2">
-                            <CheckCircle className="h-4 w-4 text-teal-600" />
-                            <span className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-600"}`}>
-                              {detail}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-
-        {/* Doctor Profile Section */}
-        <Card
-          className={`mb-16 ${
-            darkMode ? "bg-slate-800/50 backdrop-blur-sm" : "bg-white/70 backdrop-blur-sm"
-          } border-0 shadow-xl`}
-        >
-          <CardContent className="p-8">
-            <div className="grid md:grid-cols-2 gap-8 items-center">
-              <div>
-                <h2 className={`text-3xl font-bold mb-4 ${darkMode ? "text-white" : "text-slate-900"}`}>
-                  Meet Dr. Nitin Mishra
-                </h2>
-                <div className="space-y-4">
-                  <div>
-                    <h3 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-slate-900"}`}>
-                      Specialization
-                    </h3>
-                    <p className={`${darkMode ? "text-slate-300" : "text-slate-600"}`}>
-                      Dermatology, Venereology & Leprosy
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-slate-900"}`}>
-                      Qualifications
-                    </h3>
-                    <p className={`${darkMode ? "text-slate-300" : "text-slate-600"}`}>MBBS, MD (Skin & VD)</p>
-                  </div>
-                  <div>
-                    <h3 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-slate-900"}`}>
-                      Experience
-                    </h3>
-                    <p className={`${darkMode ? "text-slate-300" : "text-slate-600"}`}>
-                      20+ years in dermatological practice
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-slate-900"}`}>Contact</h3>
-                    <p className={`${darkMode ? "text-slate-300" : "text-slate-600"}`}>
-                      📞 9258924611 | ✉️ dermanitin@gmail.com
-                    </p>
+          <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl dark:bg-slate-800/70 dark:border-slate-700">
+            <CardContent className="p-6">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <Label htmlFor="email" className="dark:text-gray-100">
+                    Email Address
+                  </Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="pl-10 bg-white/50 dark:bg-slate-700 dark:text-white"
+                      placeholder="your@example.com"
+                    />
                   </div>
                 </div>
-              </div>
-              <div className="text-center">
-                <img
-                  src="/placeholder.svg?height=300&width=300"
-                  alt="Dr. Nitin Mishra"
-                  className="w-64 h-64 rounded-2xl mx-auto shadow-lg"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* CTA Section */}
-        <div className="text-center">
-          <Card
-            className={`max-w-2xl mx-auto ${
-              darkMode ? "bg-slate-800/50 backdrop-blur-sm" : "bg-white/70 backdrop-blur-sm"
-            } border-0 shadow-xl`}
-          >
-            <CardContent className="p-8">
-              <h2 className={`text-2xl font-bold mb-4 ${darkMode ? "text-white" : "text-slate-900"}`}>
-                Ready to Experience Expert Care?
-              </h2>
-              <p className={`mb-6 ${darkMode ? "text-slate-300" : "text-slate-600"}`}>
-                Take the first step towards healthier skin with a consultation from Dr. Nitin Mishra.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/appointment">
-                  <Button
-                    size="lg"
-                    className="bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-700 hover:to-teal-700"
-                  >
-                    Book Appointment
-                  </Button>
-                </Link>
-                <Link href="/chat">
-                  <Button variant="outline" size="lg" className="bg-transparent">
-                    Start Live Chat
-                  </Button>
-                </Link>
-              </div>
+                {message && (
+                  <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">{message}</div>
+                )}
+                {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">{error}</div>}
+
+                <Button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-700 hover:to-teal-700 dark:from-indigo-500 dark:to-teal-500 dark:hover:from-indigo-400 dark:hover:to-teal-400"
+                  disabled={loading}
+                >
+                  {loading ? "Sending..." : "Send Reset Link"}
+                </Button>
+
+                <div className="text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Remember your password?{" "}
+                    <Link
+                      href="/login"
+                      className="text-indigo-600 hover:text-indigo-700 font-medium dark:text-indigo-400 dark:hover:text-indigo-300"
+                    >
+                      Sign in
+                    </Link>
+                  </p>
+                </div>
+              </form>
             </CardContent>
           </Card>
         </div>
