@@ -2,14 +2,15 @@
 
 import { ClockIcon, UserIcon, PhoneIcon, XIcon } from "./Icons"
 
-interface Appointment {
+export type Appointment = {
   id: string
   patientName: string
   patientPhone: string
   appointmentDate: string
   appointmentTime: string
-  status: "pending" | "confirmed" | "completed" | "cancelled"
-  urgency: "low" | "medium" | "high"
+  clinic: string
+  urgency: string
+  status: string
   symptoms: string
 }
 
