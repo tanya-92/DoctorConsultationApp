@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "Dr. Nitin Mishra - Skin Specialist",
   description: "Expert dermatological care with 20+ years of experience",
   generator: "v0.dev",
-  themeColor: "#1976d2",
+  themeColor: "#0f172a",
   manifest: "/manifest.json",
 };
 
