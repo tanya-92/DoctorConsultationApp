@@ -2,15 +2,11 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowLeft,
   Send,
@@ -18,26 +14,47 @@ import {
   User,
   Stethoscope,
   AlertCircle,
-  MessageCircle,
   UserCheck,
   PhoneCall,
   VideoIcon,
   Loader2,
 } from "lucide-react"
 import { useTheme } from "next-themes"
-import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc, getDocs } from "firebase/firestore"
-import { db, auth } from "@/lib/firebase"
-import { onAuthStateChanged } from "firebase/auth"
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc, getDocs, where, getDoc, doc } from "firebase/firestore"
+import { db, auth, storage } from "@/lib/firebase"
+import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { v4 as uuidv4 } from "uuid"
+import { Suspense } from "react"
+import { toast } from "@/components/ui/use-toast"
+import PatientList from "../components/PatientList"
 
-export default function LiveChat() {
-  const [chatStarted, setChatStarted] = useState(false)
+// Define MessageType interface for better type safety
+type MessageType = {
+  id: string
+  text?: string
+  senderEmail: string
+  timestamp: any
+  mediaUrl?: string
+  mediaType?: "image" | "video" | "file"
+  fileName?: string
+  uid?: string
+  photoURL?: string | null
+}
+
+function LiveChatContent() {
   const [message, setMessage] = useState("")
-  const [messages, setMessages] = useState<any[]>([])
-  const [currentUser, setCurrentUser] = useState<any>(null)
-  const [roomId, setRoomId] = useState("")
+  const [messages, setMessages] = useState<MessageType[]>([])
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null)
+  const [roomId, setRoomId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const patientEmailFromUrl = searchParams.get("patientEmail")
+
+  const doctorEmail = process.env.NEXT_PUBLIC_DOCTOR_EMAIL!
 
   const doctorQuickReplies = [
     "How can I help you?",
@@ -46,15 +63,6 @@ export default function LiveChat() {
     "Thank you for your time.",
     "Do you have any allergies?",
   ]
-  const patientQuickReplies = [
-    "I have a skin issue.",
-    "Since last week...",
-    "Thank you, Doctor.",
-    "Yes, I have an allergy.",
-    "What should I apply?",
-  ]
-  const currentQuickReplies =
-    currentUser?.email === "drnitinmishraderma@gmail.com" ? doctorQuickReplies : patientQuickReplies
 
   const [preFormData, setPreFormData] = useState({
     name: "",
@@ -69,364 +77,223 @@ export default function LiveChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
 
-  // Validation function - ALL FIELDS MANDATORY
-  const validateForm = () => {
-    const errors: Record<string, string> = {}
-
-    if (!preFormData.name.trim()) {
-      errors.name = "Name is required"
-    }
-
-    if (!preFormData.age.trim()) {
-      errors.age = "Age is required"
-    } else {
-      const age = Number.parseInt(preFormData.age, 10)
-      if (isNaN(age) || age < 5 || age > 100) {
-        errors.age = "Please enter a valid age between 5 and 100"
-      }
-    }
-
-    if (!preFormData.gender) {
-      errors.gender = "Gender is required"
-    }
-
-    if (!preFormData.contact.trim()) {
-      errors.contact = "Contact number is required"
-    } else if (!/^\d{10}$/.test(preFormData.contact.replace(/\D/g, ""))) {
-      errors.contact = "Please enter a valid 10-digit contact number"
-    }
-
-    if (!preFormData.symptoms.trim()) {
-      errors.symptoms = "Please describe your symptoms"
-    }
-
-    if (!preFormData.urgency) {
-      errors.urgency = "Please select urgency level"
-    }
-
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
-  const handlePreFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validateForm()) {
-      return
-    }
-
-    setChatStarted(true)
-    setMessages([
-      {
-        id: 1,
-        sender: "system",
-        text: `Hello ${preFormData.name}! Please wait until Dr. Nitin Mishra joins the chat.`,
-        timestamp: new Date(),
-      },
-    ])
-  }
-
-  const handleInputChange = (field: string, value: string) => {
-    setPreFormData((prev) => ({ ...prev, [field]: value }))
-    // Clear error when user starts typing
-    if (formErrors[field]) {
-      setFormErrors((prev) => ({ ...prev, [field]: "" }))
-    }
-  }
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!message.trim() || !roomId || !currentUser?.email) return
+    if ((!message.trim() && !selectedFile) || !currentUser?.email || !roomId || isLoading) return
 
     setIsLoading(true)
-    const newMessage = {
-      text: message,
-      sender: currentUser.email,
-      timestamp: serverTimestamp(),
-    }
-
     try {
-      await addDoc(collection(db, "chats", roomId, "messages"), newMessage)
+      let messageData: Partial<MessageType> = {
+        senderEmail: currentUser.email,
+        timestamp: serverTimestamp(),
+        uid: currentUser.uid,
+        photoURL: currentUser.photoURL,
+      }
+
+      if (selectedFile) {
+        const fileId = uuidv4()
+        const storageRef = ref(storage, `chatMedia/${roomId}/${fileId}_${selectedFile.name}`)
+        await uploadBytes(storageRef, selectedFile)
+        const fileURL = await getDownloadURL(storageRef)
+
+        const mediaType = selectedFile.type.startsWith("image/")
+          ? "image"
+          : selectedFile.type.startsWith("video/")
+            ? "video"
+            : "file"
+
+        messageData = {
+          ...messageData,
+          mediaUrl: fileURL,
+          mediaType: mediaType,
+          fileName: selectedFile.name,
+          text: message.trim() || undefined,
+        }
+      } else {
+        messageData.text = message.trim()
+      }
+
+      await addDoc(collection(db, "chats", roomId, "messages"), messageData)
       setMessage("")
+      setSelectedFile(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
     } catch (err) {
       console.error("Error sending message: ", err)
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleCall = async (type: "audio" | "video") => {
-    if (!roomId || !currentUser?.email) return
-
-    try {
-      const response = await fetch(
-        `https://us-central1-doctor-app-98244.cloudfunctions.net/api/generate-agora-token?channelName=${roomId}&uid=${currentUser.email}&role=publisher`,
-      )
-
-      const { token } = await response.json()
-
-      router.push(`/call?channel=${roomId}&uid=${currentUser.email}&token=${token}&type=${type}`)
-    } catch (err) {
-      console.error("Failed to fetch Agora token", err)
-    }
-  }
-
-  // END CONSULTATION - Clear chat and reload
-  const handleEndConsultation = async () => {
-    if (window.confirm("Are you sure you want to end this consultation?")) {
-      try {
-        // Clear all messages in the chat room
-        if (roomId) {
-          const messagesRef = collection(db, "chats", roomId, "messages")
-          const snapshot = await getDocs(messagesRef)
-          const deletePromises = snapshot.docs.map((doc) => deleteDoc(doc.ref))
-          await Promise.all(deletePromises)
-        }
-
-        // Reset state and reload page
-        setChatStarted(false)
-        setMessages([])
-        setMessage("")
-        setPreFormData({
-          name: currentUser?.displayName || currentUser?.email?.split("@")[0] || "",
-          age: "",
-          gender: "",
-          symptoms: "",
-          contact: "",
-          urgency: "",
-        })
-
-        // Reload the page to start fresh
-        window.location.reload()
-      } catch (err) {
-        console.error("Error ending consultation: ", err)
-      }
-    }
-  }
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
-
-  const handleFileUpload = () => {
+  const handleFileUploadClick = () => {
     fileInputRef.current?.click()
   }
 
-  // Auto-scroll to bottom when messages change
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    setSelectedFile(file || null)
+  }
+
+  const handleCall = async (type: "audio" | "video") => {
+    if (!roomId || !currentUser?.email) return
+    const NEXT_PUBLIC_TOKEN_BASE_URL = process.env.NEXT_PUBLIC_TOKEN_BASE_URL
+    if (!NEXT_PUBLIC_TOKEN_BASE_URL) {
+      console.error("NEXT_PUBLIC_TOKEN_BASE_URL is not set.")
+      return
+    }
+
+    try {
+      const response = await fetch(
+        `${NEXT_PUBLIC_TOKEN_BASE_URL}?channelName=${roomId}&uid=${currentUser.email}&role=publisher`,
+      )
+      const { token } = await response.json()
+      router.push(`/call?channel=${roomId}&uid=${currentUser.email}&token=${token}&type=${type}`)
+    } catch (err) {
+      console.error("Failed to fetch Agora token", err)
+      toast({
+        title: "Error",
+        description: "Failed to initiate call. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleEndConsultation = async () => {
+    if (
+      window.confirm(
+        "Are you sure you want to end this consultation? This will clear the chat history for this patient.",
+      )
+    ) {
+      try {
+        if (roomId && patientEmailFromUrl) {
+          const activeChatsRef = collection(db, "activeChats")
+          const q = query(activeChatsRef, where("patientEmail", "==", patientEmailFromUrl), where("status", "==", "active"))
+          const snapshot = await getDocs(q)
+          const deletePromises = snapshot.docs.map((doc) => deleteDoc(doc.ref))
+          await Promise.all(deletePromises)
+
+          const messagesRef = collection(db, "chats", roomId, "messages")
+          const messagesSnapshot = await getDocs(messagesRef)
+          const messageDeletePromises = messagesSnapshot.docs.map((doc) => deleteDoc(doc.ref))
+          await Promise.all(messageDeletePromises)
+        }
+        setMessages([])
+        setMessage("")
+        setSelectedFile(null)
+        router.push("/admin/chat")
+      } catch (err) {
+        console.error("Error ending consultation: ", err)
+        toast({
+          title: "Error",
+          description: "Failed to end consultation. Please try again or contact support.",
+          variant: "destructive",
+        })
+      }
+    }
+  }
+
   useEffect(() => {
-    scrollToBottom()
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Set up Firebase Auth and real-time message listening
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setCurrentUser(user)
+    const unsubscribeAuth = onAuthStateChanged(auth, async (loggedInUser: FirebaseUser | null) => {
+      if (loggedInUser) {
+        setCurrentUser(loggedInUser)
 
-        // AUTO-FILL NAME from Firebase Auth
-        setPreFormData((prev) => ({
-          ...prev,
-          name: user.displayName || user.email?.split("@")[0] || "",
-        }))
+        const userDocRef = doc(db, "users", loggedInUser.uid)
+        const userDoc = await getDoc(userDocRef)
+        const role = userDoc.exists() ? userDoc.data().role : null
+        setUserRole(role)
 
-        const doctorEmail = "drnitinmishraderma@gmail.com"
-        const id = `${user.email}_to_${doctorEmail}`
-        setRoomId(id)
+        if (role === "admin" || role === "receptionist") {
+          if (patientEmailFromUrl) {
+            const sortedEmails = [doctorEmail, patientEmailFromUrl].sort()
+            const currentRoomId = `${sortedEmails[0]}_${sortedEmails[1]}`
+            setRoomId(currentRoomId)
 
-        // REAL-TIME MESSAGE LISTENER - Auto-refreshing
-        const messagesRef = collection(db, "chats", id, "messages")
-        const q = query(messagesRef, orderBy("timestamp"))
+            const activeChatsRef = collection(db, "activeChats")
+            const q = query(activeChatsRef, where("patientEmail", "==", patientEmailFromUrl), where("status", "==", "active"))
+            const snapshot = await getDocs(q)
 
-        const unsubMessages = onSnapshot(
-          q,
-          (snapshot) => {
-            const newMessages = snapshot.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
-            }))
-            setMessages(newMessages)
-          },
-          (error) => {
-            console.error("Error listening to messages: ", error)
-          },
-        )
+            if (!snapshot.empty) {
+              const data = snapshot.docs[0].data()
+              setPreFormData({
+                name: data.patientName || patientEmailFromUrl.split("@")[0],
+                age: data.age || "",
+                gender: data.gender || "",
+                symptoms: data.symptoms || "",
+                contact: data.contact || "",
+                urgency: data.urgency || "",
+              })
 
-        return () => unsubMessages()
+              const messagesRef = collection(db, "chats", currentRoomId, "messages")
+              const messagesQuery = query(messagesRef, orderBy("timestamp"))
+
+              const unsubMessages = onSnapshot(
+                messagesQuery,
+                (snapshot) => {
+                  const newMessages: MessageType[] = snapshot.docs.map((doc) => {
+                    const data = doc.data()
+                    return {
+                      id: doc.id,
+                      senderEmail: data.senderEmail || data.email || "unknown",
+                      text: data.text,
+                      timestamp: data.timestamp?.toDate(),
+                      mediaUrl: data.mediaUrl,
+                      mediaType: data.mediaType,
+                      fileName: data.fileName,
+                      uid: data.uid,
+                      photoURL: data.photoURL,
+                    } as MessageType
+                  })
+                  setMessages(newMessages)
+                },
+                (error) => {
+                  console.error("Error listening to messages: ", error)
+                  toast({
+                    title: "Error",
+                    description: "Failed to load messages. Please try again.",
+                    variant: "destructive",
+                  })
+                }
+              )
+              return () => unsubMessages()
+            } else {
+              router.push("/admin/chat")
+            }
+          }
+        } else {
+          router.push("/")
+        }
+      } else {
+        router.push("/")
       }
     })
 
-    return () => unsubscribe()
-  }, [])
+    return () => unsubscribeAuth()
+  }, [router, searchParams, doctorEmail, patientEmailFromUrl])
 
-  if (!chatStarted) {
+  if (!patientEmailFromUrl && (currentUser?.email === doctorEmail || userRole === "admin" || userRole === "receptionist")) {
+    return <PatientList />
+  }
+
+  if (patientEmailFromUrl && !roomId) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-        {/* Header */}
-        <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50 dark:bg-gray-800/80 dark:border-gray-700">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <Link href="/">
-                  <Button variant="ghost" size="sm" className="group">
-                    <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-                    Back to Home
-                  </Button>
-                </Link>
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-600 rounded-lg flex items-center justify-center">
-                    <MessageCircle className="h-4 w-4 text-white" />
-                  </div>
-                  <span className="text-lg font-bold text-gray-900 dark:text-gray-100">Live Chat Consultation</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-2xl mx-auto">
-            <Card className="bg-white/70 backdrop-blur-sm border-0 shadow-xl dark:bg-gray-800/70 dark:border-gray-700">
-              <CardHeader className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Stethoscope className="h-8 w-8 text-white" />
-                </div>
-                <CardTitle className="text-2xl dark:text-gray-100">Start Live Chat with Dr. Nitin Mishra</CardTitle>
-                <p className="text-gray-600 mt-2 dark:text-gray-400">
-                  Please provide some basic information before connecting with the doctor
-                </p>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handlePreFormSubmit} className="space-y-6">
-                  <div>
-                    <Label htmlFor="name" className="dark:text-gray-100">
-                      Full Name *
-                    </Label>
-                    <Input
-                      id="name"
-                      value={preFormData.name}
-                      onChange={(e) => handleInputChange("name", e.target.value)}
-                      className={`bg-white/50 dark:bg-gray-700/50 dark:text-gray-100 ${formErrors.name ? "border-red-500" : ""}`}
-                      placeholder="Enter your full name"
-                    />
-                    {formErrors.name && <p className="text-red-500 text-sm mt-1">{formErrors.name}</p>}
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="age" className="dark:text-gray-100">
-                        Age *
-                      </Label>
-                      <Input
-                        id="age"
-                        type="number"
-                        value={preFormData.age}
-                        onChange={(e) => handleInputChange("age", e.target.value)}
-                        className={`bg-white/50 dark:bg-gray-700/50 dark:text-gray-100 ${formErrors.age ? "border-red-500" : ""}`}
-                        min="5"
-                        max="100"
-                        placeholder="Your age"
-                      />
-                      {formErrors.age && <p className="text-red-500 text-sm mt-1">{formErrors.age}</p>}
-                    </div>
-                    <div>
-                      <Label htmlFor="gender" className="dark:text-gray-100">
-                        Gender *
-                      </Label>
-                      <Select value={preFormData.gender} onValueChange={(value) => handleInputChange("gender", value)}>
-                        <SelectTrigger
-                          className={`bg-white/50 dark:bg-gray-700/50 ${formErrors.gender ? "border-red-500" : ""}`}
-                        >
-                          <SelectValue placeholder="Select gender" className="dark:text-gray-100" />
-                        </SelectTrigger>
-                        <SelectContent className="dark:bg-gray-700 dark:text-gray-100">
-                          <SelectItem value="male">Male</SelectItem>
-                          <SelectItem value="female">Female</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {formErrors.gender && <p className="text-red-500 text-sm mt-1">{formErrors.gender}</p>}
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="contact" className="dark:text-gray-100">
-                      Contact Number *
-                    </Label>
-                    <Input
-                      id="contact"
-                      type="tel"
-                      value={preFormData.contact}
-                      onChange={(e) => handleInputChange("contact", e.target.value)}
-                      className={`bg-white/50 dark:bg-gray-700/50 dark:text-gray-100 ${formErrors.contact ? "border-red-500" : ""}`}
-                      placeholder="9258924611"
-                    />
-                    {formErrors.contact && <p className="text-red-500 text-sm mt-1">{formErrors.contact}</p>}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="symptoms" className="dark:text-gray-100">
-                      Symptoms / Chief Complaint *
-                    </Label>
-                    <Textarea
-                      id="symptoms"
-                      placeholder="Please describe your symptoms, skin condition, or reason for consultation in detail..."
-                      value={preFormData.symptoms}
-                      onChange={(e) => handleInputChange("symptoms", e.target.value)}
-                      className={`bg-white/50 min-h-[120px] dark:bg-gray-700/50 dark:text-gray-100 ${formErrors.symptoms ? "border-red-500" : ""}`}
-                    />
-                    {formErrors.symptoms && <p className="text-red-500 text-sm mt-1">{formErrors.symptoms}</p>}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="urgency" className="dark:text-gray-100">
-                      Urgency Level *
-                    </Label>
-                    <Select value={preFormData.urgency} onValueChange={(value) => handleInputChange("urgency", value)}>
-                      <SelectTrigger
-                        className={`bg-white/50 dark:bg-gray-700/50 ${formErrors.urgency ? "border-red-500" : ""}`}
-                      >
-                        <SelectValue placeholder="Select urgency level" className="dark:text-gray-100" />
-                      </SelectTrigger>
-                      <SelectContent className="dark:bg-gray-700 dark:text-gray-100">
-                        <SelectItem value="low">Low - General inquiry/routine consultation</SelectItem>
-                        <SelectItem value="medium">Medium - Concerning symptoms</SelectItem>
-                        <SelectItem value="high">High - Urgent consultation needed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {formErrors.urgency && <p className="text-red-500 text-sm mt-1">{formErrors.urgency}</p>}
-                  </div>
-
-                  <div className="bg-blue-50 p-4 rounded-lg dark:bg-gray-700">
-                    <div className="flex items-start space-x-3">
-                      <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 dark:text-blue-400" />
-                      <div className="text-sm text-blue-800 dark:text-blue-200">
-                        <p className="font-medium mb-1">Important Notes:</p>
-                        <ul className="space-y-1">
-                          <li>• Consultation fee: ₹500 (payable after consultation)</li>
-                          <li>• Average wait time: 5-15 minutes</li>
-                          <li>• You can upload images during the chat</li>
-                          <li>• For emergencies, please call 9258924611 directly</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 shadow-lg" size="lg">
-                    <MessageCircle className="h-5 w-5 mr-2" />
-                    Start Chat Consultation
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      {/* Header */}
       <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50 dark:bg-gray-800/80 dark:border-gray-700">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-4">
@@ -447,10 +314,8 @@ export default function LiveChat() {
       </header>
 
       <div className="container mx-auto px-4 py-4 h-[calc(100vh-80px)] grid lg:grid-cols-4 gap-4">
-        {/* Chat Section */}
         <div className="lg:col-span-3 flex flex-col">
           <Card className="flex-1 flex flex-col bg-white/70 dark:bg-gray-800/70 shadow-xl border-0">
-            {/* Chat Header */}
             <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-blue-50 dark:from-gray-700 dark:to-gray-700">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -485,32 +350,57 @@ export default function LiveChat() {
               </div>
             </CardHeader>
 
-            {/* Chat Messages */}
             <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.length === 0 && (
                 <div className="text-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-                  <p className="text-gray-500 dark:text-gray-400">Connecting to Dr. Nitin Mishra...</p>
+                  <p className="text-gray-500 dark:text-gray-400">Connecting to patient chat...</p>
                 </div>
               )}
 
-              {messages.map((msg, idx) => (
+              {messages.map((msg) => (
                 <div
-                  key={msg.id || idx}
-                  className={`flex ${msg.sender === currentUser?.email ? "justify-end" : "justify-start"}`}
+                  key={msg.id}
+                  className={`flex ${msg.senderEmail === currentUser?.email ? "justify-end" : "justify-start"} mb-2`}
                 >
                   <div
                     className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg shadow-sm ${
-                      msg.sender === currentUser?.email
+                      msg.senderEmail === currentUser?.email
                         ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white"
-                        : msg.sender === "system"
+                        : msg.senderEmail === "system"
                           ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700"
                           : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border dark:border-gray-700"
                     }`}
                   >
-                    <p className="text-sm leading-relaxed">{msg.text}</p>
+                    {msg.text && <p className="text-sm leading-relaxed">{msg.text}</p>}
+
+                    {msg.mediaUrl && msg.mediaType === "image" && (
+                      <img
+                        src={msg.mediaUrl || "/placeholder.svg"}
+                        alt={msg.fileName || "Uploaded image"}
+                        className="mt-2 rounded-md max-w-full max-h-64 object-contain"
+                      />
+                    )}
+                    {msg.mediaUrl && msg.mediaType === "video" && (
+                      <video
+                        controls
+                        src={msg.mediaUrl}
+                        className="mt-2 rounded-md max-w-full max-h-64 object-contain"
+                      />
+                    )}
+                    {msg.mediaUrl && msg.mediaType === "file" && (
+                      <a
+                        href={msg.mediaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 underline text-sm block text-white"
+                      >
+                        📎 {msg.fileName || "File"}
+                      </a>
+                    )}
+
                     <p className="text-xs mt-1 opacity-70">
-                      {msg.timestamp?.toDate?.()?.toLocaleTimeString?.() ?? new Date().toLocaleTimeString()}
+                      {msg.timestamp?.toLocaleTimeString?.() ?? new Date().toLocaleTimeString()}
                     </p>
                   </div>
                 </div>
@@ -518,12 +408,10 @@ export default function LiveChat() {
               <div ref={messagesEndRef} />
             </CardContent>
 
-            {/* Message Input */}
             <div className="border-t p-4 bg-white/50 dark:bg-gray-700/50">
-              {/* Quick Reply Buttons */}
-              {currentQuickReplies.length > 0 && (
+              {doctorQuickReplies.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {currentQuickReplies.map((reply, idx) => (
+                  {doctorQuickReplies.map((reply, idx) => (
                     <Button
                       key={idx}
                       variant="secondary"
@@ -538,13 +426,13 @@ export default function LiveChat() {
               )}
 
               <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
-                <Button type="button" variant="outline" size="sm" onClick={handleFileUpload}>
+                <Button type="button" variant="outline" size="sm" onClick={handleFileUploadClick}>
                   <Paperclip className="h-4 w-4" />
                 </Button>
                 <Input
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Type your message..."
+                  placeholder={selectedFile ? `File selected: ${selectedFile.name}` : "Type your message..."}
                   className="flex-1"
                   disabled={isLoading}
                 />
@@ -552,7 +440,7 @@ export default function LiveChat() {
                   type="submit"
                   size="sm"
                   className="bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={isLoading || !message.trim()}
+                  disabled={isLoading || (!message.trim() && !selectedFile)}
                 >
                   {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </Button>
@@ -562,13 +450,13 @@ export default function LiveChat() {
                 type="file"
                 className="hidden"
                 accept="image/*,video/*,.pdf,.doc,.docx"
-                multiple
+                multiple={false}
+                onChange={handleFileChange}
               />
             </div>
           </Card>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-4">
           <Card className="bg-white/70 dark:bg-gray-800/70 shadow-xl border-0">
             <CardHeader>
@@ -640,5 +528,19 @@ export default function LiveChat() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LiveChat() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        </div>
+      }
+    >
+      <LiveChatContent />
+    </Suspense>
   )
 }
