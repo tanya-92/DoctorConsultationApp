@@ -592,7 +592,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         <p className="text-gray-700 dark:text-gray-300 mb-4">
           Sorry! Appointments are not being accepted right now.
           <br />
-          Please check again after 6 AM tomorrow.
+          Please check again after 10 AM tomorrow.
         </p>
         <Button onClick={() => window.location.href = '/'} className="bg-blue-600 text-white hover:bg-blue-700">
           Close

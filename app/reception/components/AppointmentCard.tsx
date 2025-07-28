@@ -10,7 +10,6 @@ export type Appointment = {
   appointmentTime: string
   clinic: string
   urgency: string
-  status: string
   symptoms: string
 }
 
@@ -67,7 +66,6 @@ export default function AppointmentCard({ appointment, onDelete }: AppointmentCa
           onClick={() => onDelete(appointment.id)}
           className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
         >
-          <XIcon className="h-4 w-4" />
         </button>
       </div>
 
@@ -78,9 +76,7 @@ export default function AppointmentCard({ appointment, onDelete }: AppointmentCa
             {appointment.appointmentDate} at {appointment.appointmentTime}
           </div>
           <div className="flex space-x-2">
-            <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(appointment.status)}`}>
-              {appointment.status}
-            </span>
+            
             <span className={`px-2 py-1 text-xs font-medium rounded-full ${getUrgencyColor(appointment.urgency)}`}>
               {appointment.urgency}
             </span>

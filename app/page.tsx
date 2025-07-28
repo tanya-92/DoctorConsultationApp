@@ -136,12 +136,17 @@ export default function HomePage() {
               >
                 Contact
               </Link>
+              <Link
+                href="/why-choose-us"
+                className={`${darkMode ? "text-gray-300 hover:text-white" : "text-gray-600 hover:text-indigo-600"} transition-colors`}
+              >
+                Why Choose Us
+              </Link>
             </nav>
 
             <div className="flex items-center space-x-4">
               <Button variant="ghost" size="sm" onClick={() => setDarkMode(!darkMode)} className="p-2">
                 {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                <span className="ml-2 hidden md:inline">{darkMode ? "Light Mode" : "Dark Mode"}</span>
               </Button>
 
               {user ? (
@@ -199,7 +204,7 @@ export default function HomePage() {
                   About Doctor
                 </Link>
                 <Link href="/treatments" className={`${darkMode ? "text-gray-300" : "text-gray-600"}`}>
-                  Interactive Gallery
+                  Gallery
                 </Link>
                 <Link href="/contact" className={`${darkMode ? "text-gray-300" : "text-gray-600"}`}>
                   Contact
