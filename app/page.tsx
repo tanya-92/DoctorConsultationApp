@@ -28,7 +28,7 @@ import { logoutUser } from "@/lib/auth"
 export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
-  const [showServices, setShowServices] = useState(false)
+  const [showServices, setShowServices] = useState(true)
   const [showGallery, setShowGallery] = useState(false)
   const [serviceScrollPosition, setServiceScrollPosition] = useState(0)
   const servicesRef = useRef<HTMLDivElement>(null)
