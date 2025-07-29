@@ -1,5 +1,5 @@
 "use client"
-
+import { useRouter } from "next/navigation";
 import { useState, useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -26,6 +26,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { logoutUser } from "@/lib/auth"
 
 export default function HomePage() {
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
   const [showServices, setShowServices] = useState(true)
@@ -39,11 +40,12 @@ export default function HomePage() {
 
   const handleLogout = async () => {
     try {
-      await logoutUser()
+      await logoutUser();
+      router.push("/login"); // Redirect to login page after logout
     } catch (error) {
-      console.error("Logout error:", error)
+      console.error("Logout error:", error);
     }
-  }
+  };
 
   const scrollServices = (direction: "left" | "right") => {
     const maxScroll = Math.max(0, services.length - 3)
