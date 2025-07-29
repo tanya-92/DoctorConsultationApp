@@ -154,11 +154,16 @@ function LiveChatContent() {
         if (!snapshot.empty) {
           const existingDoc = snapshot.docs[0]
           await updateDoc(existingDoc.ref, chatData)
+          console.log("Updated activeChats document:", chatData)
         } else {
-          await addDoc(activeChatsRef, chatData)
+          const docRef = await addDoc(activeChatsRef, chatData)
+          console.log("Created new activeChats document with ID:", docRef.id, chatData)
         }
-      } catch (error) {
-        console.error("Error managing active chat:", error)
+      } catch (error: any) {
+        console.error("Error managing active chat (activeChats):", error)
+        if (error && error.code) {
+          alert(`Firestore error: ${error.code} - ${error.message}`)
+        }
         toast({
           title: "Error",
           description: "Failed to start chat. Please try again.",

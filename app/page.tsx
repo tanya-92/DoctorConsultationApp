@@ -33,6 +33,10 @@ export default function HomePage() {
   const [serviceScrollPosition, setServiceScrollPosition] = useState(0)
   const servicesRef = useRef<HTMLDivElement>(null)
 
+  // State for prank sound
+  const [isPlaying, setIsPlaying] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
   const { user, userData } = useAuth()
 
   const handleLogout = async () => {
@@ -52,23 +56,38 @@ export default function HomePage() {
     }
   }
 
+  // Prank sound handler
+  const playPrankSound = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio(
+        "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3"
+      )
+      audioRef.current.volume = 0.8 // Set to 80% volume for safety
+    }
+    if (!isPlaying) {
+      audioRef.current.play()
+      setIsPlaying(true)
+      audioRef.current.onended = () => setIsPlaying(false)
+    }
+  }
+
   const services = [
     {
       title: "Laser Hair Removal",
       description:
-        "In Our Clinic, We use the latest laser machine which uses state-of the-art to remove unwanted hair and with greater speed and comfort than other methods. Dr. Nitin Mishra is the best Skin Specialist in Bareilly.",
+        "In Our Clinic, We use the latest laser machine which uses state-of-the-art to remove unwanted hair and with greater speed and comfort than other methods. Dr. Nitin Mishra is the best Skin Specialist in Bareilly.",
       icon: "✨",
     },
     {
       title: "Chemical Peeling",
       description:
-        "Chemical peels is best method for skin tightning and skin whitening. Chemical peels uses a chemical solution to improve and smooth the texture of the facial skin by removing its damaged outer layer.",
+        "Chemical peels is best method for skin tightening and skin whitening. Chemical peels uses a chemical solution to improve and smooth the texture of the facial skin by removing its damaged outer layer.",
       icon: "🧴",
     },
     {
       title: "Vitiligo Surgery",
       description:
-        "Vitiligo is a chronic skin disorder that causes areas of skin to lose colour. It presents as depigmented (white) patches. The goal of vitiligo surgery is to achieve Cultured and Non Cultured Melanocyte Transfer, Blister Grafting, Punch Grafting, Split Thikness etc.",
+        "Vitiligo is a chronic skin disorder that causes areas of skin to lose colour. It presents as depigmented (white) patches. The goal of vitiligo surgery is to achieve Cultured and Non Cultured Melanocyte Transfer, Blister Grafting, Punch Grafting, Split Thickness etc.",
       icon: "🏥",
     },
     {
@@ -89,6 +108,16 @@ export default function HomePage() {
         "Acne or pimples is a common teenage problem. Medically acne problem is categorized into active acne (comedons, white heads, black heads), acne pigment (red, brown and black) and acne scars (atrophic, hypertrophic and ice-pick). Dr. Nitin Mishra is the best Skin Specialist in Bareilly.",
       icon: "🎯",
     },
+  ]
+
+  // Sample gallery images (replace with your own URLs or local paths)
+  const galleryImages = [
+    "/clinic2.png",
+    "/clinic5.png",
+    "/clinic8.png",
+    "/clinic4.png",
+    "/clinic1.png",
+    "/clinic3.png",
   ]
 
   return (
@@ -237,7 +266,7 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative py-20 overflow-hidden">
+      <section className="relative py-20 pb-32 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-teal-600/10"></div>
         <div className="container mx-auto px-4 relative">
           <div className="grid lg:grid-cols-2 gap-12 items-center relative">
@@ -271,7 +300,7 @@ export default function HomePage() {
                     <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
-                <Link href="/chat">
+                <Link href="/patient/chat">
                   <Button
                     size="lg"
                     variant="outline"
@@ -284,6 +313,7 @@ export default function HomePage() {
                     Start Live Chat
                   </Button>
                 </Link>
+                
               </div>
 
               <div className="flex items-center space-x-8">
@@ -302,26 +332,32 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="relative z-10">
-              <div className="relative z-10">
-                <img
-                  src="/placeholder.svg?height=500&width=400"
-                  alt="Dr. Nitin Mishra"
-                  className="rounded-2xl shadow-2xl w-full max-w-md mx-auto"
-                />
-              </div>
-              <div className="absolute -bottom-6 -right-6 bg-white/90 backdrop-blur-sm p-6 rounded-xl shadow-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                    <Shield className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div>
-                    <div className={`font-semibold ${darkMode ? "text-gray-900" : "text-gray-900"}`}>
-                      Certified & Licensed
+            <div className="relative z-10 flex justify-center">
+              <div className="relative group">
+                {/* Beautiful border container */}
+                <div className="relative p-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-teal-500 rounded-3xl shadow-2xl group-hover:shadow-3xl transition-all duration-300">
+                  <div className="bg-white rounded-2xl p-1 shadow-inner">
+                    <img
+                      src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/doctor-award.jpg-lTIEbH4xBAMehhJONWbfhUwLiYMMRz.jpeg"
+                      alt="Dr. Nitin Mishra receiving professional recognition"
+                      className="rounded-xl w-full max-w-md mx-auto object-cover shadow-lg group-hover:scale-[1.02] transition-transform duration-300"
+                      style={{ aspectRatio: "4/3", height: "auto", minHeight: "350px" }}
+                    />
+                    {/* Text Box Below Image */}
+                    <div
+                      className={`text-center p-4 rounded-b-xl ${darkMode ? "bg-slate-800/95 text-white" : "bg-white/95 text-gray-900"} backdrop-blur-md border-t ${darkMode ? "border-slate-700" : "border-gray-200"}`}
+                    >
+                      <div className="font-bold text-lg mb-1">Certified & Licensed</div>
+                      <div className="text-indigo-600 font-semibold text-base">MD (Skin & VD)</div>
+                      <div className="text-sm mt-1">Board Certified Dermatologist</div>
                     </div>
-                    <div className="text-sm text-gray-600">MD (Skin & VD)</div>
                   </div>
                 </div>
+
+                {/* Decorative elements */}
+                <div className="absolute -top-4 -right-4 w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full animate-pulse shadow-lg"></div>
+                <div className="absolute -bottom-4 -left-4 w-6 h-6 bg-gradient-to-r from-pink-400 to-red-500 rounded-full animate-pulse shadow-lg"></div>
+                <div className="absolute top-1/2 -left-8 w-4 h-4 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full animate-bounce shadow-lg"></div>
               </div>
             </div>
           </div>
@@ -485,7 +521,7 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 mb-8">
-            {[1, 2, 3].map((index) => (
+            {galleryImages.slice(0, 3).map((image, index) => (
               <Card
                 key={index}
                 className={`group cursor-pointer hover:shadow-xl transition-all duration-300 border-0 overflow-hidden ${
@@ -495,8 +531,8 @@ export default function HomePage() {
               >
                 <div className="relative">
                   <img
-                    src={`/placeholder.svg?height=200&width=300`}
-                    alt={`Clinic Image ${index}`}
+                    src={image}
+                    alt={`Clinic Image ${index + 1}`}
                     className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                   <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors duration-300"></div>
@@ -618,7 +654,7 @@ export default function HomePage() {
                 Book Appointment
               </Button>
             </Link>
-            <Link href="/chat">
+            <Link href="/patient/chat">
               <Button
                 size="lg"
                 variant="outline"
@@ -718,7 +754,7 @@ export default function HomePage() {
           </div>
 
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 Dr. Nitin Mishra - Skin Specialist. All rights reserved.</p>
+            <p>&copy; 2025 Dr. Nitin Mishra - Skin Specialist. All rights reserved.</p>
           </div>
         </div>
       </footer>
@@ -726,7 +762,7 @@ export default function HomePage() {
       {/* Mobile Bottom CTA */}
       <div className="fixed bottom-0 left-0 right-0 md:hidden bg-white/90 backdrop-blur-md border-t border-gray-200 p-4 z-50">
         <div className="flex space-x-3">
-          <Link href="/chat" className="flex-1">
+          <Link href="/patient/chat" className="flex-1">
             <Button variant="outline" className="w-full bg-transparent">
               Chat Now
             </Button>
@@ -736,6 +772,7 @@ export default function HomePage() {
           </Link>
         </div>
       </div>
+
       {/* Gallery Modal */}
       {showGallery && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
@@ -747,11 +784,11 @@ export default function HomePage() {
               </Button>
             </div>
             <div className="p-4 grid md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[70vh] overflow-y-auto">
-              {[1, 2, 3, 4, 5, 6].map((index) => (
+              {galleryImages.map((image, index) => (
                 <img
                   key={index}
-                  src={`/placeholder.svg?height=200&width=300`}
-                  alt={`Clinic Image ${index}`}
+                  src={image}
+                  alt={`Clinic Image ${index + 1}`}
                   className="w-full h-48 object-cover rounded-lg"
                 />
               ))}
