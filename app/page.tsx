@@ -33,8 +33,6 @@ export default function HomePage() {
   const [serviceScrollPosition, setServiceScrollPosition] = useState(0)
   const servicesRef = useRef<HTMLDivElement>(null)
 
-  // State for prank sound
-  const [isPlaying, setIsPlaying] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const { user, userData } = useAuth()
@@ -56,59 +54,51 @@ export default function HomePage() {
     }
   }
 
-  // Prank sound handler
-  const playPrankSound = () => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio(
-        "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3"
-      )
-      audioRef.current.volume = 0.8 // Set to 80% volume for safety
-    }
-    if (!isPlaying) {
-      audioRef.current.play()
-      setIsPlaying(true)
-      audioRef.current.onended = () => setIsPlaying(false)
-    }
-  }
-
-  const services = [
-    {
-      title: "Laser Hair Removal",
-      description:
-        "In Our Clinic, We use the latest laser machine which uses state-of-the-art to remove unwanted hair and with greater speed and comfort than other methods. Dr. Nitin Mishra is the best Skin Specialist in Bareilly.",
-      icon: "✨",
-    },
-    {
-      title: "Chemical Peeling",
-      description:
-        "Chemical peels is best method for skin tightening and skin whitening. Chemical peels uses a chemical solution to improve and smooth the texture of the facial skin by removing its damaged outer layer.",
-      icon: "🧴",
-    },
-    {
-      title: "Vitiligo Surgery",
-      description:
-        "Vitiligo is a chronic skin disorder that causes areas of skin to lose colour. It presents as depigmented (white) patches. The goal of vitiligo surgery is to achieve Cultured and Non Cultured Melanocyte Transfer, Blister Grafting, Punch Grafting, Split Thickness etc.",
-      icon: "🏥",
-    },
-    {
-      title: "Electro Surgery",
-      description:
-        "Electro surgery refers to the cutting and coagulation of tissue using high-frequency electrical current. In addition, they should understand the mechanism of action and how to troubleshoot equipment. Visit us at our clinic Infront of Vikash Bhavan, Rampur Garden, Bareilly-243001 (U.P).",
-      icon: "⚡",
-    },
-    {
-      title: "Radio Frequency Surgery",
-      description:
-        "At Our Clinic, all these problems can be cured in one sitting with the help of latest and innovative RADIO FREQUENCY MACHINE. This machine removes the unwanted mole, skin tags, sun spots, warts without any scarring and with no or very minimal bleeding. Dr. Nitin Mishra is the best Skin Specialist.",
-      icon: "📡",
-    },
-    {
-      title: "Acne Surgery",
-      description:
-        "Acne or pimples is a common teenage problem. Medically acne problem is categorized into active acne (comedons, white heads, black heads), acne pigment (red, brown and black) and acne scars (atrophic, hypertrophic and ice-pick). Dr. Nitin Mishra is the best Skin Specialist in Bareilly.",
-      icon: "🎯",
-    },
-  ]
+  // Update the services array with image URLs
+const services = [
+  {
+    title: "Laser Hair Removal",
+    description:
+      "In Our Clinic, We use the latest laser machine which uses state-of-the-art to remove unwanted hair and with greater speed and comfort than other methods. Each laser pulse can treat multiple hairs in a fraction of a second, making treatments quick.",
+    icon: "✨",
+    image: "/laserhairremoval.jpg", // Replace with your image path or URL
+  },
+  {
+    title: "Chemical Peeling",
+    description:
+      "Chemical peels is best method for skin tightening and skin whitening. Chemical peels uses a chemical solution to improve and smooth the texture of the facial skin by removing its damaged outer layer, recovery varies by peel depth.",
+    icon: "🧴",
+    image: "/chemicalpeeling.jpg", // Replace with your image path or URL
+  },
+  {
+    title: "Vitiligo Surgery",
+    description:
+      "Vitiligo is a chronic skin disorder that causes areas of skin to lose colour. It presents as depigmented (white) patches. The goal of vitiligo surgery is to achieve Cultured and Non Cultured Melanocyte Transfer, Blister Grafting, Punch Grafting, Split Thickness etc.",
+    icon: "🏥",
+    image: "/vitiligo.jpg", // Replace with your image path or URL
+  },
+  {
+    title: "Electro Surgery",
+    description:
+      "Electro surgery refers to the cutting and coagulation of tissue using high-frequency electrical current. In addition, they should understand the mechanism of action, recovery time varies depending on the size and depth of the treated area",
+    icon: "⚡",
+    image: "/electrosurgery.jpeg", // Replace with your image path or URL
+  },
+  {
+    title: "Radio Frequency Surgery",
+    description:
+      "At Our Clinic, all these problems can be cured in one sitting with the help of latest and innovative RADIO FREQUENCY MACHINE. This machine removes the unwanted mole, skin tags, sun spots, warts without any scarring and with no or very minimal bleeding.",
+    icon: "📡",
+    image: "/radiofrequency.jpeg", // Replace with your image path or URL
+  },
+  {
+    title: "Acne Surgery",
+    description:
+      "Acne or pimples is a common teenage problem. Medically acne problem is categorized into active acne (comedons, white heads, black heads), acne pigment (red, brown and black) and acne scars (atrophic, hypertrophic and ice-pick).",
+    icon: "🎯",
+    image: "/acnesurgery.jpeg", // Replace with your image path or URL
+  },
+];
 
   // Sample gallery images (replace with your own URLs or local paths)
   const galleryImages = [
@@ -426,87 +416,90 @@ export default function HomePage() {
 
       {/* Services */}
       <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 mb-4">Why Choose Us</Badge>
-            <h2 className={`text-3xl md:text-4xl font-bold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>
-              Reasons to Trust Dr. Nitin Mishra
-            </h2>
-            <p className={`text-xl max-w-2xl mx-auto mb-8 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-              Experience, expertise, and personalized care for your skin health
-            </p>
+  <div className="container mx-auto px-4">
+    <div className="text-center mb-16">
+      <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 mb-4">Why Choose Us</Badge>
+      <h2 className={`text-3xl md:text-4xl font-bold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>
+        Reasons to Trust Dr. Nitin Mishra
+      </h2>
+      <p className={`text-xl max-w-2xl mx-auto mb-8 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+        Experience, expertise, and personalized care for your skin health
+      </p>
+      <Button
+        onClick={() => setShowServices(!showServices)}
+        className="bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-700 hover:to-teal-700 shadow-lg"
+      >
+        {showServices ? "Hide Services" : "View Services"}
+      </Button>
+
+      {/* Interactive Service Cards */}
+      {showServices && (
+        <div className="mt-12 relative">
+          <div className="flex items-center justify-center space-x-4 mb-6">
             <Button
-              onClick={() => setShowServices(!showServices)}
-              className="bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-700 hover:to-teal-700 shadow-lg"
+              variant="outline"
+              size="sm"
+              onClick={() => scrollServices("left")}
+              className="rounded-full p-2"
             >
-              {showServices ? "Hide Services" : "View Services"}
+              <ArrowLeft className="h-4 w-4" />
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => scrollServices("right")}
+              className="rounded-full p-2"
+            >
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
 
-            {/* Interactive Service Cards */}
-            {showServices && (
-              <div className="mt-12 relative">
-                <div className="flex items-center justify-center space-x-4 mb-6">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => scrollServices("left")}
-                    className="rounded-full p-2"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => scrollServices("right")}
-                    className="rounded-full p-2"
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <div className="overflow-hidden">
-                  <div
-                    ref={servicesRef}
-                    className="flex space-x-6 transition-transform duration-500 ease-in-out"
-                    style={{ transform: `translateX(-${serviceScrollPosition * 320}px)` }}
-                  >
-                    {services.map((service, index) => (
-                      <div
-                        key={index}
-                        className={`min-w-[350px] group shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border-0 rounded-xl p-6 ${
-                          darkMode ? "bg-slate-800/50 backdrop-blur-sm" : "bg-white/70 backdrop-blur-sm"
-                        }`}
-                      >
-                        <div className="text-center">
-                          <div className="text-4xl mb-4">{service.icon}</div>
-                          <img
-                            src={`/placeholder.svg?height=150&width=300`}
-                            alt={service.title}
-                            className="w-full h-32 object-cover rounded-lg mb-4"
-                          />
-                          <h3 className={`text-xl font-semibold mb-3 ${darkMode ? "text-white" : "text-blue-900"}`}>
-                            {service.title}
-                          </h3>
-                          <p className={`mb-4 text-sm leading-relaxed ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
-                            {service.description}
-                          </p>
-                          <Link href="/appointment">
-                            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white transition-all">
-                              Book Now
-                            </Button>
-                          </Link>
-                        </div>
-                      </div>
-                    ))}
+          <div className="overflow-hidden">
+            <div
+              ref={servicesRef}
+              className="flex space-x-6 transition-transform duration-500 ease-in-out"
+              style={{ transform: `translateX(-${serviceScrollPosition * 320}px)` }}
+            >
+              {services.map((service, index) => (
+                <div
+                  key={index}
+                  className={`min-w-[350px] group shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border-0 rounded-xl p-6 ${
+                    darkMode ? "bg-slate-800/50 backdrop-blur-sm" : "bg-white/70 backdrop-blur-sm"
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className="text-4xl mb-4">{service.icon}</div>
+                    <img
+                      src={service.image}
+                      alt={service.title}
+                      className="w-full h-32 object-cover rounded-lg mb-4"
+                      onError={(e) => {
+                        e.currentTarget.src = "/placeholder.svg?height=150&width=300"; // Fallback image
+                      }}
+                    />
+                    <h3 className={`text-xl font-semibold mb-3 ${darkMode ? "text-white" : "text-blue-900"}`}>
+                      {service.title}
+                    </h3>
+                    <p className={`mb-4 text-sm leading-relaxed ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+                      {service.description}
+                    </p>
+                    <Link href="/appointment">
+                      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white transition-all">
+                        Book Now
+                      </Button>
+                    </Link>
                   </div>
                 </div>
-              </div>
-            )}
-
-            <p className="text-center font-semibold text-lg mt-8">Consultation Fee: ₹500</p>
+              ))}
+            </div>
           </div>
         </div>
-      </section>
+      )}
+
+      <p className="text-center font-semibold text-lg mt-8">Consultation Fee: ₹500</p>
+    </div>
+  </div>
+</section>
 
       {/* Interactive Gallery Preview */}
       <section className="py-20">
