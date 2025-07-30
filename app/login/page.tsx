@@ -1,5 +1,6 @@
 "use client"
-
+import { useDarkMode } from "@/contexts/dark-mode-context";
+import { Sun, Moon } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type React from "react";
@@ -27,6 +28,7 @@ export default function Login() {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const { user } = useAuth();
+  const { darkMode, toggleDarkMode } = useDarkMode();
 
   const [ref, inView] = useInView({
     triggerOnce: true,
@@ -155,14 +157,19 @@ export default function Login() {
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
               >
-                <select
-                  value={theme}
-                  onChange={(e) => setTheme(e.target.value)}
-                  className="bg-white border rounded px-3 py-1.5 text-sm shadow-sm dark:bg-slate-700 dark:text-white dark:border-slate-600"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleDarkMode}
+                  className="p-2"
+                  aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
                 >
-                  <option value="dark">Dark</option>
-                  <option value="light">Light</option>
-                </select>
+                  {darkMode ? (
+                    <Sun className="h-4 w-4" />
+                  ) : (
+                    <Moon className="h-4 w-4" />
+                  )}
+                </Button>
               </motion.div>
             )}
           </div>

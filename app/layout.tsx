@@ -1,14 +1,18 @@
-import type { Metadata, Viewport } from "next";
-import "./globals.css";
-import { AuthProvider } from "@/contexts/auth-context";
-import RegisterSW from "@/components/RegisterSW";
+// layout.tsx
+import { ThemeProvider } from 'next-themes'
+import { DarkModeInitializer } from "@/components/dark-mode-initializer"
+import type { Metadata, Viewport } from "next"
+import "./globals.css"
+import { AuthProvider } from "@/contexts/auth-context"
+import { DarkModeProvider } from "@/contexts/dark-mode-context"
+import RegisterSW from "@/components/RegisterSW"
 
 export const metadata: Metadata = {
   title: "Dr. Nitin Mishra - Skin Specialist",
   description: "Expert dermatological care with 20+ years of experience",
   generator: "v0.dev",
   manifest: "/manifest.json",
-};
+}
 
 export const viewport: Viewport = {
   themeColor: "#0f172a",
@@ -17,10 +21,10 @@ export const viewport: Viewport = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* 🔹 PWA & mobile support */}
         <link rel="manifest" href="/manifest.json" />
@@ -35,10 +39,18 @@ export default function RootLayout({
       </head>
       <body>
         <AuthProvider>
-          <RegisterSW />
+        <DarkModeProvider>
+          <DarkModeInitializer /> {/* Add this line */}
+          <ThemeProvider 
+          attribute="class" 
+          defaultTheme="system" 
+          enableSystem
+          disableTransitionOnChange>
           {children}
+        </ThemeProvider>
+        </DarkModeProvider>
         </AuthProvider>
       </body>
     </html>
-  );
+  )
 }

@@ -4,6 +4,8 @@ import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useTheme } from "next-themes"
+import { useState, useEffect } from "react"
 import {
   Users,
   UserCheck,
@@ -16,6 +18,7 @@ import {
   Phone,
   Video,
 } from "lucide-react"
+
 
 const statsCards = [
   {
@@ -106,6 +109,27 @@ const systemAlerts = [
 ]
 
 export default function AdminDashboard() {
+  const { theme, setTheme, systemTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  const [currentTheme, setCurrentTheme] = useState('light')
+
+  useEffect(() => {
+    setMounted(true)
+    if (theme) {
+      setCurrentTheme(theme === 'system' ? systemTheme || 'light' : theme)
+    }
+  }, [theme, systemTheme])
+
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white dark:bg-gray-900">
+        {/* Loading spinner or skeleton */}
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-800 dark:border-gray-200" />
+      </div>
+    )
+  }
+
+
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
@@ -117,16 +141,16 @@ export default function AdminDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
           >
-            <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+            <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl hover:shadow-2xl transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{stat.title}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{stat.title}</p>
                     <p className="text-3xl font-bold text-gray-900 dark:text-white">{stat.value}</p>
                     <div className="flex items-center mt-2">
-                      <TrendingUp className="h-4 w-4 text-green-600 mr-1" />
-                      <span className="text-sm font-medium text-green-600">{stat.change}</span>
-                      <span className="text-sm text-gray-500 ml-1">vs last month</span>
+                      <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400 mr-1" />
+                      <span className="text-sm font-medium text-green-600 dark:text-green-400">{stat.change}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">vs last month</span>
                     </div>
                   </div>
                   <div
@@ -149,11 +173,11 @@ export default function AdminDashboard() {
           transition={{ delay: 0.4 }}
           className="lg:col-span-2"
         >
-          <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-xl">
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span>Recent Appointments</span>
-                <Button variant="outline" size="sm">
+                <span className="text-gray-900 dark:text-white">Recent Appointments</span>
+                <Button variant="outline" size="sm" className="dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
                   View All
                 </Button>
               </CardTitle>
@@ -163,7 +187,7 @@ export default function AdminDashboard() {
                 {recentAppointments.map((appointment) => (
                   <div
                     key={appointment.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
                   >
                     <div className="flex items-center space-x-4">
                       <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
@@ -177,7 +201,7 @@ export default function AdminDashboard() {
                       </div>
                       <div>
                         <p className="font-medium text-gray-900 dark:text-white">{appointment.patient}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                        <p className="text-sm text-gray-500 dark:text-gray-300">
                           with {appointment.doctor} • {appointment.time}
                         </p>
                       </div>
@@ -195,7 +219,7 @@ export default function AdminDashboard() {
                           ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                           : appointment.status === "ongoing"
                             ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                            : ""
+                            : "dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
                       }
                     >
                       {appointment.status}
@@ -215,57 +239,57 @@ export default function AdminDashboard() {
           className="space-y-6"
         >
           {/* System Status */}
-          <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-xl">
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl">
             <CardHeader>
-              <CardTitle>System Status</CardTitle>
+              <CardTitle className="text-gray-900 dark:text-white">System Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">API Status</span>
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">API Status</span>
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm text-green-600">Operational</span>
+                  <span className="text-sm text-green-600 dark:text-green-400">Operational</span>
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Database</span>
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Database</span>
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm text-green-600">Healthy</span>
+                  <span className="text-sm text-green-600 dark:text-green-400">Healthy</span>
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Video Calls</span>
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Video Calls</span>
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm text-green-600">Active</span>
+                  <span className="text-sm text-green-600 dark:text-green-400">Active</span>
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Chat Service</span>
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Chat Service</span>
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm text-green-600">Online</span>
+                  <span className="text-sm text-green-600 dark:text-green-400">Online</span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* System Alerts */}
-          <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-xl">
+          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-xl">
             <CardHeader>
-              <CardTitle>System Alerts</CardTitle>
+              <CardTitle className="text-gray-900 dark:text-white">System Alerts</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {systemAlerts.map((alert, index) => (
-                  <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+                  <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-700">
                     {alert.type === "warning" ? (
-                      <AlertCircle className="h-4 w-4 text-orange-500 mt-0.5" />
+                      <AlertCircle className="h-4 w-4 text-orange-500 dark:text-orange-400 mt-0.5" />
                     ) : alert.type === "success" ? (
-                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                      <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5" />
                     ) : (
-                      <Clock className="h-4 w-4 text-blue-500 mt-0.5" />
+                      <Clock className="h-4 w-4 text-blue-500 dark:text-blue-400 mt-0.5" />
                     )}
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-900 dark:text-white">{alert.message}</p>
