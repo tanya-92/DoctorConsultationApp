@@ -273,7 +273,9 @@ export default function WhyChooseUs() {
                     </p>
                   </div>
                   <div>
-                    <h3 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-slate-900"}`}>Contact</h3>
+                    <h3 className={`text-lg font-semibold ${darkMode ? "text-white" : "text-slate-900"}`}>
+                      Contact
+                    </h3>
                     <p className={`${darkMode ? "text-slate-300" : "text-slate-600"}`}>
                       📞 9258924611 | ✉️ dermanitin@gmail.com
                     </p>
@@ -282,9 +284,12 @@ export default function WhyChooseUs() {
               </div>
               <div className="text-center">
                 <img
-                  src="/placeholder.svg?height=300&width=300"
-                  alt="Dr. Nitin Mishra"
+                  src="/doctor.jpg" // Updated with actual image path
+                  alt="Portrait of Dr. Nitin Mishra, Dermatologist"
                   className="w-64 h-64 rounded-2xl mx-auto shadow-lg"
+                  onError={(e) => {
+                    e.currentTarget.src = "/placeholder.svg?height=300&width=300" // Fallback image
+                  }}
                 />
               </div>
             </div>
