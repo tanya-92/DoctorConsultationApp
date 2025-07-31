@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { auth, db, storage } from "@/lib/firebase"
-import { addDoc, collection, orderBy, query, serverTimestamp, onSnapshot, where, updateDoc, doc, getDocs, deleteDoc } from "firebase/firestore"
+import { addDoc, collection, orderBy, query, serverTimestamp, onSnapshot, where, updateDoc, doc, getDocs, deleteDoc, getDoc, setDoc } from "firebase/firestore"
 import { useAuthState } from "react-firebase-hooks/auth"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -194,77 +194,90 @@ function LiveChatContent() {
     }
   }
 
-  useEffect(() => {
-    const unsubscribeAuth = auth.onAuthStateChanged(async (loggedInUser: FirebaseUser | null) => {
-      if (loggedInUser) {
-        setPreFormData((prev) => ({
-          ...prev,
-          name: loggedInUser.displayName || loggedInUser.email?.split("@")[0] || "",
-        }))
+  // File: page.tsx
+// Replace the existing useEffect with this
+useEffect(() => {
+  const unsubscribeAuth = auth.onAuthStateChanged(async (loggedInUser: FirebaseUser | null) => {
+    if (loggedInUser) {
+      setPreFormData((prev) => ({
+        ...prev,
+        name: loggedInUser.displayName || loggedInUser.email?.split("@")[0] || "",
+      }));
 
-        const sortedEmails = [loggedInUser.email!, doctorEmail].sort()
-        const currentRoomId = `${sortedEmails[0]}_${sortedEmails[1]}`
-        setRoomId(currentRoomId)
-
-        const messagesRef = collection(db, "chats", currentRoomId, "messages")
-        const q = query(messagesRef, orderBy("timestamp"))
-
-        const unsubMessages = onSnapshot(
-          q,
-          (snapshot) => {
-            const newMessages: MessageType[] = snapshot.docs.map((doc) => {
-              const data = doc.data()
-              return {
-                id: doc.id,
-                senderEmail: data.senderEmail || data.email || "unknown",
-                text: data.text,
-                timestamp: data.timestamp?.toDate(),
-                mediaUrl: data.mediaUrl,
-                mediaType: data.mediaType,
-                fileName: data.fileName,
-                uid: data.uid,
-                photoURL: data.photoURL,
-              } as MessageType
-            })
-            setMessages(newMessages)
-          },
-          (error) => {
-            console.error("Error listening to messages: ", error)
-            toast({
-              title: "Error",
-              description: "Failed to load messages. Please try again.",
-              variant: "destructive",
-            })
-          },
-        )
-
-        return () => unsubMessages()
-      } else {
-        await removeFromActiveChats()
-        router.push("/")
+      // Create or update users document
+      const userDocRef = doc(db, "users", loggedInUser.uid);
+      const userDoc = await getDoc(userDocRef);
+      if (!userDoc.exists()) {
+        await setDoc(userDocRef, {
+          email: loggedInUser.email,
+          role: "patient",
+          createdAt: serverTimestamp(),
+        });
       }
-    })
 
-    const handleBeforeUnload = async () => {
-      await removeFromActiveChats()
+      const sortedEmails = [loggedInUser.email!, doctorEmail].sort();
+      const currentRoomId = `${sortedEmails[0]}_${sortedEmails[1]}`;
+      setRoomId(currentRoomId);
+
+      const messagesRef = collection(db, "chats", currentRoomId, "messages");
+      const q = query(messagesRef, orderBy("timestamp"));
+
+      const unsubMessages = onSnapshot(
+        q,
+        (snapshot) => {
+          const newMessages: MessageType[] = snapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              senderEmail: data.senderEmail || data.email || "unknown",
+              text: data.text,
+              timestamp: data.timestamp?.toDate(),
+              mediaUrl: data.mediaUrl,
+              mediaType: data.mediaType,
+              fileName: data.fileName,
+              uid: data.uid,
+              photoURL: data.photoURL,
+            } as MessageType;
+          });
+          setMessages(newMessages);
+        },
+        (error) => {
+          console.error("Error listening to messages: ", error);
+          toast({
+            title: "Error",
+            description: "Failed to load messages. Please try again.",
+            variant: "destructive",
+          });
+        },
+      );
+
+      return () => unsubMessages();
+    } else {
+      await removeFromActiveChats();
+      router.push("/");
     }
+  });
 
-    const handleVisibilityChange = async () => {
-      if (document.hidden) {
-        await removeFromActiveChats()
-      }
+  const handleBeforeUnload = async () => {
+    await removeFromActiveChats();
+  };
+
+  const handleVisibilityChange = async () => {
+    if (document.hidden) {
+      await removeFromActiveChats();
     }
+  };
 
-    window.addEventListener("beforeunload", handleBeforeUnload)
-    document.addEventListener("visibilitychange", handleVisibilityChange)
+  window.addEventListener("beforeunload", handleBeforeUnload);
+  document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    return () => {
-      unsubscribeAuth()
-      window.removeEventListener("beforeunload", handleBeforeUnload)
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
-      removeFromActiveChats()
-    }
-  }, [user, router, doctorEmail])
+  return () => {
+    unsubscribeAuth();
+    window.removeEventListener("beforeunload", handleBeforeUnload);
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+    removeFromActiveChats();
+  };
+}, [user, router, doctorEmail]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })

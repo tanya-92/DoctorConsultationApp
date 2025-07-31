@@ -292,7 +292,7 @@ const services = [
                     <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
-                <Link href="/patient/chat">
+                <Link href="/chat">
                   <Button
                     size="lg"
                     variant="outline"
@@ -649,7 +649,7 @@ const services = [
                 Book Appointment
               </Button>
             </Link>
-            <Link href="/patient/chat">
+            <Link href="/chat">
               <Button
                 size="lg"
                 variant="outline"
@@ -757,7 +757,7 @@ const services = [
       {/* Mobile Bottom CTA */}
       <div className="fixed bottom-0 left-0 right-0 md:hidden bg-white/90 backdrop-blur-md border-t border-gray-200 p-4 z-50">
         <div className="flex space-x-3">
-          <Link href="/patient/chat" className="flex-1">
+          <Link href="/chat" className="flex-1">
             <Button variant="outline" className="w-full bg-transparent">
               Chat Now
             </Button>
