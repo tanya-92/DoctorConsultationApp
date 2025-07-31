@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { auth, db, storage } from "@/lib/firebase"
-import { addDoc, collection, orderBy, query, serverTimestamp, onSnapshot, where, updateDoc, doc, getDocs, deleteDoc, getDoc, setDoc } from "firebase/firestore"
+import { addDoc, collection, orderBy, query, serverTimestamp, onSnapshot, where, updateDoc, getDocs,getDoc, deleteDoc, doc, setDoc } from "firebase/firestore"
 import { useAuthState } from "react-firebase-hooks/auth"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -39,13 +39,13 @@ import type { User as FirebaseUser } from "firebase/auth"
 type MessageType = {
   id: string
   text?: string
-  senderEmail: string
-  timestamp: any
+  senderEmail: string // Required
+  timestamp: any // Firestore Timestamp or Date
   mediaUrl?: string
   mediaType?: "image" | "video" | "file"
   fileName?: string
-  uid?: string
-  photoURL?: string | null
+  uid?: string // Optional: for sender's UID (from auth)
+  photoURL?: string | null // Optional: for sender's photo (from auth) - Allow null
 }
 
 function LiveChatContent() {
@@ -122,16 +122,6 @@ function LiveChatContent() {
       return
     }
 
-    setChatStarted(true)
-    setMessages([
-      {
-        id: uuidv4(),
-        senderEmail: "system",
-        text: `Hello ${preFormData.name}! Please wait until Dr. Nitin Mishra joins the chat.`,
-        timestamp: new Date(),
-      },
-    ])
-
     if (user?.email && roomId) {
       try {
         const activeChatsRef = collection(db, "activeChats")
@@ -156,21 +146,29 @@ function LiveChatContent() {
           await updateDoc(existingDoc.ref, chatData)
           console.log("Updated activeChats document:", chatData)
         } else {
-          const docRef = await addDoc(activeChatsRef, chatData)
-          console.log("Created new activeChats document with ID:", docRef.id, chatData)
+          await addDoc(activeChatsRef, chatData)
+          console.log("Created new activeChats document:", chatData)
         }
       } catch (error: any) {
-        console.error("Error managing active chat (activeChats):", error)
-        if (error && error.code) {
-          alert(`Firestore error: ${error.code} - ${error.message}`)
-        }
+        console.error("Error managing active chat:", error)
         toast({
           title: "Error",
           description: "Failed to start chat. Please try again.",
           variant: "destructive",
         })
+        return
       }
     }
+
+    setChatStarted(true)
+    setMessages([
+      {
+        id: uuidv4(),
+        senderEmail: "system",
+        text: `Hello ${preFormData.name}! Please wait until Dr. Nitin Mishra joins the chat.`,
+        timestamp: new Date(),
+      },
+    ])
   }
 
   const handleInputChange = (field: string, value: string) => {
@@ -194,90 +192,88 @@ function LiveChatContent() {
     }
   }
 
-  // File: page.tsx
-// Replace the existing useEffect with this
-useEffect(() => {
-  const unsubscribeAuth = auth.onAuthStateChanged(async (loggedInUser: FirebaseUser | null) => {
-    if (loggedInUser) {
-      setPreFormData((prev) => ({
-        ...prev,
-        name: loggedInUser.displayName || loggedInUser.email?.split("@")[0] || "",
-      }));
+  useEffect(() => {
+    const unsubscribeAuth = auth.onAuthStateChanged(async (loggedInUser: FirebaseUser | null) => {
+      if (loggedInUser) {
+        setPreFormData((prev) => ({
+          ...prev,
+          name: loggedInUser.displayName || loggedInUser.email?.split("@")[0] || "",
+        }))
 
-      // Create or update users document
-      const userDocRef = doc(db, "users", loggedInUser.uid);
-      const userDoc = await getDoc(userDocRef);
-      if (!userDoc.exists()) {
-        await setDoc(userDocRef, {
-          email: loggedInUser.email,
-          role: "patient",
-          createdAt: serverTimestamp(),
-        });
+        // Create or update users document
+        const userDocRef = doc(db, "users", loggedInUser.uid)
+        const userDoc = await getDoc(userDocRef)
+        if (!userDoc.exists()) {
+          await setDoc(userDocRef, {
+            email: loggedInUser.email,
+            role: "patient",
+            createdAt: serverTimestamp(),
+          })
+        }
+
+        const sortedEmails = [loggedInUser.email!, doctorEmail].sort()
+        const currentRoomId = `${sortedEmails[0]}_${sortedEmails[1]}`
+        setRoomId(currentRoomId)
+
+        const messagesRef = collection(db, "chats", currentRoomId, "messages")
+        const q = query(messagesRef, orderBy("timestamp"))
+
+        const unsubMessages = onSnapshot(
+          q,
+          (snapshot) => {
+            const newMessages: MessageType[] = snapshot.docs.map((doc) => {
+              const data = doc.data()
+              return {
+                id: doc.id,
+                senderEmail: data.senderEmail || data.email || "unknown",
+                text: data.text,
+                timestamp: data.timestamp?.toDate(),
+                mediaUrl: data.mediaUrl,
+                mediaType: data.mediaType,
+                fileName: data.fileName,
+                uid: data.uid,
+                photoURL: data.photoURL,
+              } as MessageType
+            })
+            setMessages(newMessages)
+          },
+          (error) => {
+            console.error("Error listening to messages: ", error)
+            toast({
+              title: "Error",
+              description: "Failed to load messages. Please try again.",
+              variant: "destructive",
+            })
+          }
+        )
+
+        return () => unsubMessages()
+      } else {
+        await removeFromActiveChats()
+        router.push("/")
       }
+    })
 
-      const sortedEmails = [loggedInUser.email!, doctorEmail].sort();
-      const currentRoomId = `${sortedEmails[0]}_${sortedEmails[1]}`;
-      setRoomId(currentRoomId);
-
-      const messagesRef = collection(db, "chats", currentRoomId, "messages");
-      const q = query(messagesRef, orderBy("timestamp"));
-
-      const unsubMessages = onSnapshot(
-        q,
-        (snapshot) => {
-          const newMessages: MessageType[] = snapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              senderEmail: data.senderEmail || data.email || "unknown",
-              text: data.text,
-              timestamp: data.timestamp?.toDate(),
-              mediaUrl: data.mediaUrl,
-              mediaType: data.mediaType,
-              fileName: data.fileName,
-              uid: data.uid,
-              photoURL: data.photoURL,
-            } as MessageType;
-          });
-          setMessages(newMessages);
-        },
-        (error) => {
-          console.error("Error listening to messages: ", error);
-          toast({
-            title: "Error",
-            description: "Failed to load messages. Please try again.",
-            variant: "destructive",
-          });
-        },
-      );
-
-      return () => unsubMessages();
-    } else {
-      await removeFromActiveChats();
-      router.push("/");
+    const handleBeforeUnload = async () => {
+      await removeFromActiveChats()
     }
-  });
 
-  const handleBeforeUnload = async () => {
-    await removeFromActiveChats();
-  };
-
-  const handleVisibilityChange = async () => {
-    if (document.hidden) {
-      await removeFromActiveChats();
+    const handleVisibilityChange = async () => {
+      if (document.hidden) {
+        await removeFromActiveChats()
+      }
     }
-  };
 
-  window.addEventListener("beforeunload", handleBeforeUnload);
-  document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    document.addEventListener("visibilitychange", handleVisibilityChange)
 
-  return () => {
-    unsubscribeAuth();
-    window.removeEventListener("beforeunload", handleBeforeUnload);
-    document.removeEventListener("visibilitychange", handleVisibilityChange);
-    removeFromActiveChats();
-  };
-}, [user, router, doctorEmail]);
+    return () => {
+      unsubscribeAuth()
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      removeFromActiveChats()
+    }
+  }, [user, router, doctorEmail])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -350,7 +346,7 @@ useEffect(() => {
     if (window.confirm("Are you sure you want to end this consultation? This will clear your chat history.")) {
       try {
         await removeFromActiveChats()
-        
+
         if (roomId) {
           const messagesRef = collection(db, "chats", roomId, "messages")
           const snapshot = await getDocs(messagesRef)
@@ -408,6 +404,7 @@ useEffect(() => {
   if (!chatStarted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        {/* Header */}
         <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50 dark:bg-gray-800/80 dark:border-gray-700">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
@@ -572,6 +569,7 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-slate-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      {/* Header */}
       <header className="bg-white/80 backdrop-blur-md shadow-sm border-b sticky top-0 z-50 dark:bg-gray-800/80 dark:border-gray-700">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-4">
@@ -592,8 +590,10 @@ useEffect(() => {
       </header>
 
       <div className="container mx-auto px-4 py-4 h-[calc(100vh-80px)] grid lg:grid-cols-4 gap-4">
+        {/* Chat Section */}
         <div className="lg:col-span-3 flex flex-col">
           <Card className="flex-1 flex flex-col bg-white/70 dark:bg-gray-800/70 shadow-xl border-0">
+            {/* Chat Header */}
             <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-blue-50 dark:from-gray-700 dark:to-gray-700">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -628,6 +628,7 @@ useEffect(() => {
               </div>
             </CardHeader>
 
+            {/* Chat Messages */}
             <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.length === 0 && (
                 <div className="text-center py-8">
@@ -642,12 +643,13 @@ useEffect(() => {
                   className={`flex ${msg.senderEmail === user?.email ? "justify-end" : "justify-start"} mb-2`}
                 >
                   <div
-                    className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg shadow-sm ${msg.senderEmail === user?.email
+                    className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg shadow-sm ${
+                      msg.senderEmail === user?.email
                         ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white"
                         : msg.senderEmail === "system"
                           ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700"
                           : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border dark:border-gray-700"
-                      }`}
+                    }`}
                   >
                     {msg.text && <p className="text-sm leading-relaxed">{msg.text}</p>}
 
@@ -685,6 +687,7 @@ useEffect(() => {
               <div ref={bottomRef} />
             </CardContent>
 
+            {/* Message Input */}
             <div className="border-t p-4 bg-white/50 dark:bg-gray-700/50">
               {patientQuickReplies.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -734,6 +737,7 @@ useEffect(() => {
           </Card>
         </div>
 
+        {/* Sidebar */}
         <div className="space-y-4">
           <Card className="bg-white/70 dark:bg-gray-800/70 shadow-xl border-0">
             <CardHeader>
