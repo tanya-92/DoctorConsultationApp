@@ -1,7 +1,7 @@
 "use client"
 import { useDarkMode } from "@/contexts/dark-mode-context"
 import { useRouter } from "next/navigation";
-import { useState, useRef } from "react"
+import { useEffect, useState, useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -39,12 +39,41 @@ export default function HomePage() {
 
   const { user, userData } = useAuth()
 
+  useEffect(() => {
+  const role = localStorage.getItem("role");
+  if (role === "admin") {
+    router.replace("/admin");
+  } else if (role === "reception") {
+    router.replace("/reception");
+  }
+  }, []);
+  
+  useEffect(() => {
+  if (user && userData?.role) {
+    if (userData.role === "admin") {
+      router.replace("/admin");
+    } else if (userData.role === "reception") {
+      router.replace("/reception");
+    }
+  }
+
+}, [user, userData, router]);
   const handleLogout = async () => {
     try {
+      localStorage.removeItem("role");
       await logoutUser();
       router.push("/login"); // Redirect to login page after logout
     } catch (error) {
       console.error("Logout error:", error);
+    }
+  };
+
+  // Handle chat button click with authentication check
+  const handleChatClick = () => {
+    if (user) {
+      router.push("/chat");
+    } else {
+      router.push("/login");
     }
   };
 
@@ -300,19 +329,17 @@ export default function HomePage() {
                     <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </Link>
-                <Link href="/chat">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className={`text-lg px-8 py-4 backdrop-blur-sm ${darkMode
-                      ? "border-gray-600 text-gray-300 hover:bg-gray-800"
-                      : "border-white/20 bg-white/10 hover:bg-white/20"
-                      }`}
-                  >
-                    Start Live Chat
-                  </Button>
-                </Link>
-
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={handleChatClick}
+                  className={`text-lg px-8 py-4 backdrop-blur-sm ${darkMode
+                    ? "border-gray-600 text-gray-300 hover:bg-gray-800"
+                    : "border-white/20 bg-white/10 hover:bg-white/20"
+                    }`}
+                >
+                  Start Live Chat
+                </Button>
               </div>
 
               <div className="flex items-center space-x-8">
@@ -654,15 +681,14 @@ export default function HomePage() {
                 Book Appointment
               </Button>
             </Link>
-            <Link href="/chat">
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-white text-white hover:bg-white hover:text-indigo-600 text-lg px-8 py-4 bg-transparent"
-              >
-                Start Live Chat
-              </Button>
-            </Link>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleChatClick}
+              className="border-white text-white hover:bg-white hover:text-indigo-600 text-lg px-8 py-4 bg-transparent"
+            >
+              Start Live Chat
+            </Button>
           </div>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-6">
@@ -762,11 +788,9 @@ export default function HomePage() {
       {/* Mobile Bottom CTA */}
       <div className="fixed bottom-0 left-0 right-0 md:hidden bg-white/90 backdrop-blur-md border-t border-gray-200 p-4 z-50">
         <div className="flex space-x-3">
-          <Link href="/chat" className="flex-1">
-            <Button variant="outline" className="w-full bg-transparent">
-              Chat Now
-            </Button>
-          </Link>
+          <Button variant="outline" onClick={handleChatClick} className="flex-1 bg-transparent">
+            Chat Now
+          </Button>
           <Link href="/appointment" className="flex-1">
             <Button className="w-full bg-gradient-to-r from-indigo-600 to-teal-600">Book Appointment</Button>
           </Link>

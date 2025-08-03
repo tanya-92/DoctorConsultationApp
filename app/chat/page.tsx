@@ -431,7 +431,7 @@ function LiveChatContent() {
           mediaUrl: fileURL,
           mediaType: mediaType,
           fileName: selectedFile.name,
-          text: newMessage.trim() || undefined,
+          text: newMessage.trim(),
         }
       } else {
         messageData.text = newMessage.trim()
@@ -465,49 +465,40 @@ function LiveChatContent() {
   }
 
   const handleEndConsultation = async () => {
-    if (window.confirm("Are you sure you want to end this consultation? This will clear your chat history.")) {
-      try {
-        console.log("Ending consultation for user:", user?.email)
-        await removeFromActiveChats(true) // Force deletion
-
-        if (roomId) {
-          const messagesRef = collection(db, "chats", roomId, "messages")
-          const snapshot = await getDocs(messagesRef)
-          console.log("Deleting messages, found:", snapshot.docs.length, "documents")
-          const deletePromises = snapshot.docs.map((doc) => {
-            console.log("Deleting message:", doc.id)
-            return deleteDoc(doc.ref)
-          })
-          await Promise.all(deletePromises)
-        }
-        setChatStarted(false)
-        setMessages([])
-        setNewMessage("")
-        setSelectedFile(null)
-        setPreFormData({
-          name: user?.displayName || user?.email?.split("@")[0] || "",
-          age: "",
-          gender: "",
-          symptoms: "",
-          contact: "",
-          urgency: "",
+  if (window.confirm("Are you sure you want to end this consultation? This will end the current session.")) {
+    try {
+      console.log("Ending consultation for user:", user?.email)
+      
+      await removeFromActiveChats(true) 
+      setChatStarted(false)
+      setMessages([])
+      setNewMessage("")
+      setSelectedFile(null)
+      setPreFormData({
+        name: user?.displayName || user?.email?.split("@")[0] || "",
+        age: "",
+        gender: "",
+        symptoms: "",
+        contact: "",
+        urgency: "",
+      })
+      
+      console.log("Consultation ended, redirecting to home")
+      router.push("/")
+    } catch (err) {
+      console.error("Error ending consultation:", {
+        errorCode: (err as any).code,
+        errorMessage: (err as Error).message,
+        stack: (err as Error).stack
+      })
+      toast({
+        title: "Error",
+        description: "Failed to end consultation. Please try again or contact support.",
+        variant: "destructive",
         })
-        console.log("Consultation ended, redirecting to home")
-        router.push("/")
-      } catch (err) {
-        console.error("Error ending consultation:", {
-          errorCode: (err as any).code,
-          errorMessage: (err as Error).message,
-          stack: (err as Error).stack
-        })
-        toast({
-          title: "Error",
-          description: "Failed to end consultation. Please try again or contact support.",
-          variant: "destructive",
-        })
-      }
     }
   }
+}
 
   const handleCall = async (type: "audio" | "video") => {
     if (!roomId || !user?.email) return

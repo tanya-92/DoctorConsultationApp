@@ -402,11 +402,14 @@ export default function DoctorDashboard() {
                       return;
                     }
 
-                    // Step 2: Update the role in that document
+                    // Step 2: Update the role and set forceLogout flag
                     const userDoc = querySnapshot.docs[0];
-                    await updateDoc(userDoc.ref, { role });
+                    await updateDoc(userDoc.ref, { 
+                      role,
+                      forceLogout: true // Set flag to force logout
+                    });
 
-                    alert(`Role updated to '${role}' for ${email}`);
+                    alert(`Role updated to '${role}' for ${email}. User will be logged out.`);
                     form.reset();
                   } catch (err) {
                     console.error(err);

@@ -39,12 +39,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const data = await getUserData(user.uid)
           setUserData(data)
+
+          // ✅ Save role in localStorage for instant redirect
+          if (data?.role) {
+            localStorage.setItem("role", data.role)
+          } else {
+            localStorage.removeItem("role")
+          }
         } catch (error) {
           console.error("Error fetching user data:", error)
           setUserData(null)
+          localStorage.removeItem("role") // ❌ remove on failure
         }
       } else {
         setUserData(null)
+        localStorage.removeItem("role")   // ❌ remove on logout
       }
 
       setLoading(false)

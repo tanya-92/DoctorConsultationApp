@@ -107,7 +107,7 @@ function LiveChatContent() {
           mediaUrl: fileURL,
           mediaType: mediaType,
           fileName: selectedFile.name,
-          text: message.trim() || undefined,
+          text: message.trim(),
         }
       } else {
         messageData.text = message.trim()
@@ -165,38 +165,34 @@ function LiveChatContent() {
   }
 
   const handleEndConsultation = async () => {
-    if (
-      window.confirm(
-        "Are you sure you want to end this consultation? This will clear the chat history for this patient.",
-      )
-    ) {
-      try {
-        if (roomId && patientEmailFromUrl) {
-          const activeChatsRef = collection(db, "activeChats")
-          const q = query(activeChatsRef, where("patientEmail", "==", patientEmailFromUrl), where("status", "==", "active"))
-          const snapshot = await getDocs(q)
-          const deletePromises = snapshot.docs.map((doc) => deleteDoc(doc.ref))
-          await Promise.all(deletePromises)
-
-          const messagesRef = collection(db, "chats", roomId, "messages")
-          const messagesSnapshot = await getDocs(messagesRef)
-          const messageDeletePromises = messagesSnapshot.docs.map((doc) => deleteDoc(doc.ref))
-          await Promise.all(messageDeletePromises)
-        }
-        setMessages([])
-        setMessage("")
-        setSelectedFile(null)
-        router.push("/admin/chat")
-      } catch (err) {
-        console.error("Error ending consultation: ", err)
-        toast({
-          title: "Error",
-          description: "Failed to end consultation. Please try again or contact support.",
-          variant: "destructive",
-        })
+  if (
+    window.confirm(
+      "Are you sure you want to end this consultation? This will end the current active session.",
+    )
+  ) {
+    try {
+      if (roomId && patientEmailFromUrl) {
+        const activeChatsRef = collection(db, "activeChats")
+        const q = query(activeChatsRef, where("patientEmail", "==", patientEmailFromUrl), where("status", "==", "active"))
+        const snapshot = await getDocs(q)
+        const deletePromises = snapshot.docs.map((doc) => deleteDoc(doc.ref))
+        await Promise.all(deletePromises)
       }
+      
+      setMessages([])
+      setMessage("")
+      setSelectedFile(null)
+      router.push("/admin/chat")
+    } catch (err) {
+      console.error("Error ending consultation: ", err)
+      toast({
+        title: "Error",
+        description: "Failed to end consultation. Please try again or contact support.",
+        variant: "destructive",
+      })
     }
   }
+}
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })

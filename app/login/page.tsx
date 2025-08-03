@@ -80,6 +80,7 @@ export default function Login() {
 
       const userData = docSnap.data();
       const role = userData.role;
+      localStorage.setItem("role", role); 
 
       if (role === "receptionist") {
         router.push("/reception");
