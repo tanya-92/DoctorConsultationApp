@@ -18,7 +18,7 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from "@/components/ui/sidebar"
-import { LayoutDashboard, Calendar, Users, DollarSign, LogOut, Bell, Stethoscope } from "lucide-react"
+import { LayoutDashboard, Calendar, Users, DollarSign, LogOut, Bell, Stethoscope, Phone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -80,6 +80,19 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
       isActive: pathname === "/admin",
     },
     {
+      title: "Chats",
+      icon: Stethoscope,
+      href: "/admin/chat",
+      isActive: pathname === "/admin/chat", // Fixed: removed trailing space
+      badge: waitingPatients > 0 ? waitingPatients : undefined,
+    },
+    {
+      title: "Calls",
+      icon: Phone,
+      href: "/admin/call",
+      isActive: pathname === "/admin/call",
+    },
+    {
       title: "Appointments",
       icon: Calendar,
       href: "/admin/appointments",
@@ -138,9 +151,9 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
                       >
                         <item.icon className="h-5 w-5 transition-transform group-hover:scale-110" />
                         <span className="font-medium">{item.title}</span>
-                        {item.title === "Dashboard" && waitingPatients > 0 && (
+                        {item.badge && (
                           <Badge variant="destructive" className="ml-auto animate-pulse">
-                            {waitingPatients}
+                            {item.badge}
                           </Badge>
                         )}
                       </Link>
