@@ -279,14 +279,13 @@ const handleSubmit = async (e: React.FormEvent) => {
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="email" className="text-blue-900 dark:text-slate-200">
-                        Email Address *
+                        Email Address
                       </Label>
                       <Input
                         id="email"
                         type="email"
                         value={formData.email}
                         onChange={(e) => handleInputChange("email", e.target.value)}
-                        required
                         className="bg-white/50 dark:bg-slate-700 dark:text-slate-50"
                       />
                     </div>
