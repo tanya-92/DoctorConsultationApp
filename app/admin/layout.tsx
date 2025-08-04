@@ -89,7 +89,7 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
     {
       title: "Calls",
       icon: Phone,
-      href: "/admin/call",
+      href: "/admin/calls",
       isActive: pathname === "/admin/call",
     },
     {
