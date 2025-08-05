@@ -82,6 +82,7 @@ export default function AppointmentsPage() {
           phone: a.phone || "",
           email: a.email || "",
           clinic: a.clinic || "",
+          patientId: a.patientId || "",
           clinicId: a.clinicId || "",
           time: a.time || "",
           symptoms: a.symptoms || "",
