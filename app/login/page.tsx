@@ -96,7 +96,17 @@ export default function Login() {
         router.push("/");
       }
     } catch (error: any) {
-      setError(error.message || "Login failed. Please check your credentials.");
+      let message = "Login failed. Please check your credentials.";
+
+      if (error.code === "auth/invalid-credential" || error.code === "auth/wrong-password") {
+        message = "Invalid email or password.";
+      } else if (error.code === "auth/user-not-found") {
+        message = "User not found. Please check your email.";
+      } else if (error.code === "auth/too-many-requests") {
+        message = "Too many login attempts. Please try again later.";
+      }
+
+      setError(message);
     } finally {
       setLoading(false);
     }
