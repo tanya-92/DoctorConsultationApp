@@ -37,27 +37,41 @@ export default function HomePage() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  const { user, userData } = useAuth()
+  const { user, userData, loading } = useAuth()
+
+  const [checkingRedirect, setCheckingRedirect] = useState(true);
 
   useEffect(() => {
-  const role = localStorage.getItem("role");
-  if (role === "admin") {
-    router.replace("/admin");
-  } else if (role === "receptionist") {
-    router.replace("/reception");
-  }
-  }, []);
-  
-  useEffect(() => {
-  if (user && userData?.role) {
-    if (userData.role === "admin") {
+    const role = localStorage.getItem("role");
+    if (role === "admin") {
       router.replace("/admin");
-    } else if (userData.role === "receptionist") {
+    } else if (role === "receptionist") {
       router.replace("/reception");
+    } else {
+      setCheckingRedirect(false); // ✅ Role not found, stop redirect wait
     }
+  }, []);
+
+  useEffect(() => {
+    if (user && userData?.role) {
+      if (userData.role === "admin") {
+        router.replace("/admin");
+      } else if (userData.role === "receptionist") {
+        router.replace("/reception");
+      } else {
+        setCheckingRedirect(false); // ✅ No special role, render homepage
+      }
+    }
+  }, [user, userData, router]);
+
+  if (checkingRedirect || loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-xl font-semibold">Redirecting...</p>
+      </div>
+    );
   }
 
-}, [user, userData, router]);
   const handleLogout = async () => {
     try {
       localStorage.removeItem("role");
