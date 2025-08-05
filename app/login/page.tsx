@@ -64,6 +64,14 @@ export default function Login() {
     try {
       const userCredential = await loginUser(formData.email, formData.password);
       const user = userCredential;
+      const token = await user.getIdToken();
+      await fetch("/api/setToken", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token }),
+      });
 
       const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "drnitinmishraderma@gmail.com";
       if (user.email === ADMIN_EMAIL) {
@@ -80,7 +88,7 @@ export default function Login() {
 
       const userData = docSnap.data();
       const role = userData.role;
-      localStorage.setItem("role", role); 
+      localStorage.setItem("role", role);
 
       if (role === "receptionist") {
         router.push("/reception");
@@ -127,7 +135,7 @@ export default function Login() {
       >
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <motion.div 
+            <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
@@ -140,8 +148,8 @@ export default function Login() {
                 </Button>
               </Link>
               <div className="flex items-center space-x-3">
-                <motion.div 
-                  animate={{ 
+                <motion.div
+                  animate={{
                     rotate: [0, 10, 0],
                     transition: { repeat: Infinity, duration: 3 }
                   }}

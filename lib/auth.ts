@@ -8,7 +8,7 @@ export interface UserData {
   fullName: string
   age: number
   createdAt: Date
-  role?: "admin" | "reception" | "patient"; 
+  role?: "admin" | "receptionist" | "patient";
 }
 
 // Register new user

@@ -43,7 +43,7 @@ export default function HomePage() {
   const role = localStorage.getItem("role");
   if (role === "admin") {
     router.replace("/admin");
-  } else if (role === "reception") {
+  } else if (role === "receptionist") {
     router.replace("/reception");
   }
   }, []);
@@ -52,7 +52,7 @@ export default function HomePage() {
   if (user && userData?.role) {
     if (userData.role === "admin") {
       router.replace("/admin");
-    } else if (userData.role === "reception") {
+    } else if (userData.role === "receptionist") {
       router.replace("/reception");
     }
   }
