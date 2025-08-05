@@ -62,6 +62,7 @@ function LiveChatContent() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { theme } = useTheme()
+  const INACTIVITY_LIMIT = 10 * 60 * 1000 // 10 minutes in milliseconds
 
   const doctorEmail = process.env.NEXT_PUBLIC_DOCTOR_EMAIL!
 
@@ -134,7 +135,7 @@ function LiveChatContent() {
         try {
           const userDocRef = doc(db, "users", user.uid)
           const userDoc = await getDoc(userDocRef)
-          
+
           if (userDoc.exists()) {
             console.log("User document exists:", userDoc.data())
             console.log("User role:", userDoc.data().role)
@@ -148,7 +149,7 @@ function LiveChatContent() {
 
         const activeChatsRef = collection(db, "activeChats")
         const q = query(activeChatsRef, where("patientEmail", "==", user.email), where("status", "==", "active"))
-        
+
         console.log("=== TESTING FIRESTORE PERMISSIONS ===")
         try {
           console.log("Testing read permissions...")
@@ -171,6 +172,7 @@ function LiveChatContent() {
           urgency: preFormData.urgency,
           timestamp: serverTimestamp(),
           status: "active",
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes expiration
         }
 
         console.log("=== DEBUG: About to create/update activeChats ===")
@@ -186,16 +188,16 @@ function LiveChatContent() {
           console.log("✅ Document updated successfully")
         } else {
           console.log("📝 Creating new document")
-          
+
           try {
             console.log("About to call addDoc with:", {
               collection: "activeChats",
               data: chatData
             })
-            
+
             const docRef = await addDoc(activeChatsRef, chatData)
             console.log("✅ addDoc returned successfully with ID:", docRef.id)
-            
+
             // Verify document creation
             setTimeout(async () => {
               try {
@@ -209,7 +211,7 @@ function LiveChatContent() {
                 console.error("❌ Error verifying document:", verifyError)
               }
             }, 1000)
-            
+
           } catch (createError) {
             console.error("❌ Document creation failed:", createError)
             if (typeof createError === "object" && createError !== null && "code" in createError) {
@@ -228,7 +230,7 @@ function LiveChatContent() {
         console.error("Error message:", error.message)
         console.error("Error code:", error.code)
         console.error("Full error:", error)
-        
+
         toast({
           title: "Error",
           description: `Failed to start chat: ${error.message}`,
@@ -286,7 +288,7 @@ function LiveChatContent() {
       if (loggedInUser) {
         console.log("=== AUTH STATE CHANGE ===")
         console.log("User logged in:", loggedInUser.email)
-        
+
         setPreFormData((prev) => ({
           ...prev,
           name: loggedInUser.displayName || loggedInUser.email?.split("@")[0] || "",
@@ -295,7 +297,7 @@ function LiveChatContent() {
         try {
           const userDocRef = doc(db, "users", loggedInUser.uid)
           const userDoc = await getDoc(userDocRef)
-          
+
           if (!userDoc.exists()) {
             console.log("Creating user document for:", loggedInUser.email)
             const userData = {
@@ -368,14 +370,14 @@ function LiveChatContent() {
         }
       } else {
         console.log("No user logged in, redirecting to home")
-        await removeFromActiveChats(false)
+        await removeFromActiveChats(true)
         router.push("/")
       }
     })
 
     const handleBeforeUnload = async () => {
       console.log("Before unload triggered")
-      await removeFromActiveChats(false)
+      await removeFromActiveChats(true)
     }
 
     const handleVisibilityChange = async () => {
@@ -396,6 +398,55 @@ function LiveChatContent() {
       // Removed removeFromActiveChats from cleanup to prevent unintended deletion
     }
   }, [user, router, doctorEmail])
+
+  useEffect(() => {
+    if (!user) return // Do nothing if user is not logged in
+
+    let inactivityTimer: NodeJS.Timeout
+
+    const resetInactivityTimer = () => {
+      clearTimeout(inactivityTimer)
+      inactivityTimer = setTimeout(async () => {
+        console.log("🛑 User inactive for 10 minutes, removing from activeChats.")
+
+        await removeFromActiveChats(true)
+
+        toast({
+          title: "Session Ended",
+          description: "You were inactive for more than 10 minutes. The consultation session has ended.",
+          variant: "destructive",
+        })
+
+        setChatStarted(false)
+        setMessages([])
+        setNewMessage("")
+        setSelectedFile(null)
+        setPreFormData({
+          name: user?.displayName || user?.email?.split("@")[0] || "",
+          age: "",
+          gender: "",
+          symptoms: "",
+          contact: "",
+          urgency: "",
+        })
+
+        router.push("/")
+      }, INACTIVITY_LIMIT)
+    }
+
+    // List of events considered as activity
+    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"]
+    events.forEach((event) => window.addEventListener(event, resetInactivityTimer))
+
+    // Start the initial timer
+    resetInactivityTimer()
+
+    return () => {
+      clearTimeout(inactivityTimer)
+      events.forEach((event) => window.removeEventListener(event, resetInactivityTimer))
+    }
+  }, [user])
+
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -465,40 +516,40 @@ function LiveChatContent() {
   }
 
   const handleEndConsultation = async () => {
-  if (window.confirm("Are you sure you want to end this consultation? This will end the current session.")) {
-    try {
-      console.log("Ending consultation for user:", user?.email)
-      
-      await removeFromActiveChats(true) 
-      setChatStarted(false)
-      setMessages([])
-      setNewMessage("")
-      setSelectedFile(null)
-      setPreFormData({
-        name: user?.displayName || user?.email?.split("@")[0] || "",
-        age: "",
-        gender: "",
-        symptoms: "",
-        contact: "",
-        urgency: "",
-      })
-      
-      console.log("Consultation ended, redirecting to home")
-      router.push("/")
-    } catch (err) {
-      console.error("Error ending consultation:", {
-        errorCode: (err as any).code,
-        errorMessage: (err as Error).message,
-        stack: (err as Error).stack
-      })
-      toast({
-        title: "Error",
-        description: "Failed to end consultation. Please try again or contact support.",
-        variant: "destructive",
+    if (window.confirm("Are you sure you want to end this consultation? This will end the current session.")) {
+      try {
+        console.log("Ending consultation for user:", user?.email)
+
+        await removeFromActiveChats(true)
+        setChatStarted(false)
+        setMessages([])
+        setNewMessage("")
+        setSelectedFile(null)
+        setPreFormData({
+          name: user?.displayName || user?.email?.split("@")[0] || "",
+          age: "",
+          gender: "",
+          symptoms: "",
+          contact: "",
+          urgency: "",
         })
+
+        console.log("Consultation ended, redirecting to home")
+        router.push("/")
+      } catch (err) {
+        console.error("Error ending consultation:", {
+          errorCode: (err as any).code,
+          errorMessage: (err as Error).message,
+          stack: (err as Error).stack
+        })
+        toast({
+          title: "Error",
+          description: "Failed to end consultation. Please try again or contact support.",
+          variant: "destructive",
+        })
+      }
     }
   }
-}
 
   const handleCall = async (type: "audio" | "video") => {
     if (!roomId || !user?.email) return
@@ -766,13 +817,12 @@ function LiveChatContent() {
                   className={`flex ${msg.senderEmail === user?.email ? "justify-end" : "justify-start"} mb-2`}
                 >
                   <div
-                    className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg shadow-sm ${
-                      msg.senderEmail === user?.email
+                    className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg shadow-sm ${msg.senderEmail === user?.email
                         ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white"
                         : msg.senderEmail === "system"
                           ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700"
                           : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border dark:border-gray-700"
-                    }`}
+                      }`}
                   >
                     {msg.text && <p className="text-sm leading-relaxed">{msg.text}</p>}
 
