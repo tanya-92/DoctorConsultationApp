@@ -187,7 +187,7 @@ export default function DoctorDashboard() {
       color: "from-teal-500 to-teal-600",
       hoverColor: "hover:from-teal-600 hover:to-teal-700",
       bgColor: "bg-teal-50 dark:bg-teal-950/20",
-      href: "/admin/chats",
+      href: "/admin/chat",
       count: "Available",
     },
     {
