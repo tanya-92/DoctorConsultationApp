@@ -42,15 +42,25 @@ export default function HomePage() {
   const [checkingRedirect, setCheckingRedirect] = useState(true);
 
   useEffect(() => {
-    const role = localStorage.getItem("role");
-    if (role === "admin") {
-      router.replace("/admin");
-    } else if (role === "receptionist") {
-      router.replace("/reception");
-    } else {
-      setCheckingRedirect(false); // ✅ Role not found, stop redirect wait
-    }
+  const role = localStorage.getItem("role");
+  if (role === "admin") {
+    router.replace("/admin");
+  } else if (role === "reception") {
+    router.replace("/reception/overview");
+  }
   }, []);
+  
+  useEffect(() => {
+    if (user && userData?.role) {
+      if (userData.role === "admin") {
+        router.replace("/admin");
+      } else if (userData.role === "receptionist") {
+        router.replace("/reception");
+      } else {
+        setCheckingRedirect(false); // ✅ No special role, render homepage
+      }
+    }
+  }, [user, userData, router]);
 
   useEffect(() => {
     if (user && userData?.role) {

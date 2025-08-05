@@ -38,6 +38,7 @@ interface CallLog {
   id: string
   patientName: string
   patientEmail: string
+  patientUid: string
   callType: "audio" | "video"
   duration: number
   startTime: any
@@ -106,7 +107,7 @@ export default function CallsPage() {
       // Move to call logs
       await addDoc(collection(db, "callLogs"), {
         patientName: call.patientName,
-        patientEmail: call.patientEmail,
+        patientUid: call.patientUid,
         callType: call.callType,
         duration: 0,
         startTime: call.createdAt,
@@ -235,7 +236,7 @@ export default function CallsPage() {
                             <div className="flex items-center space-x-4 text-sm text-slate-600 dark:text-slate-400">
                               <span className="flex items-center space-x-1">
                                 <User className="h-4 w-4" />
-                                <span>{call.patientEmail}</span>
+                                <span>{call.patientUid}</span>
                               </span>
                               <span className="flex items-center space-x-1">
                                 <Clock className="h-4 w-4" />

@@ -1,17 +1,17 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { useAuthState } from "react-firebase-hooks/auth"
-import { addDoc, collection, serverTimestamp } from "firebase/firestore"
-import { auth, db } from "@/lib/firebase"
-import { Phone, Video, Loader2 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { Phone, Video, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface CallInitiatorProps {
-  patientName?: string
-  patientEmail?: string
-  urgency?: "low" | "medium" | "high"
+  patientName?: string;
+  patientEmail?: string;
+  urgency?: "low" | "medium" | "high";
 }
 
 export function CallInitiator({
@@ -19,18 +19,20 @@ export function CallInitiator({
   patientEmail = "patient@example.com",
   urgency = "medium",
 }: CallInitiatorProps) {
-  const [user] = useAuthState(auth)
-  const [initiating, setInitiating] = useState<string | null>(null)
-  const router = useRouter()
+  const [user] = useAuthState(auth);
+  const [initiating, setInitiating] = useState<string | null>(null);
+  const router = useRouter();
 
   const initiateCall = async (callType: "audio" | "video") => {
-    if (!user) return
+    if (!user) return;
 
-    setInitiating(callType)
+    setInitiating(callType);
 
     try {
       // Generate unique channel name
-      const channelName = `${user.uid}_${Date.now()}`
+      const patientUid = user.uid;
+      const doctorEmail = process.env.NEXT_PUBLIC_DOCTOR_EMAIL!
+      const channelName = `${doctorEmail}_${patientUid}`;
 
       // Create active call document
       const callDoc = await addDoc(collection(db, "activeCalls"), {
@@ -43,17 +45,20 @@ export function CallInitiator({
         channelName,
         urgency,
         patientUid: user.uid,
-      })
+        doctorEmail,
+      });
 
       // Navigate to call interface
-      router.push(`/call?channel=${channelName}&type=${callType}&callId=${callDoc.id}`)
+      router.push(
+        `/call?channel=${channelName}&type=${callType}&callId=${callDoc.id}`
+      );
     } catch (error) {
-      console.error("Error initiating call:", error)
-      alert("Failed to initiate call. Please try again.")
+      console.error("Error initiating call:", error);
+      alert("Failed to initiate call. Please try again.");
     } finally {
-      setInitiating(null)
+      setInitiating(null);
     }
-  }
+  };
 
   return (
     <div className="flex space-x-3">
@@ -62,7 +67,11 @@ export function CallInitiator({
         disabled={!!initiating}
         className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
       >
-        {initiating === "audio" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Phone className="h-4 w-4" />}
+        {initiating === "audio" ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Phone className="h-4 w-4" />
+        )}
         <span>Audio Call</span>
       </Button>
 
@@ -71,9 +80,13 @@ export function CallInitiator({
         disabled={!!initiating}
         className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700"
       >
-        {initiating === "video" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+        {initiating === "video" ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Video className="h-4 w-4" />
+        )}
         <span>Video Call</span>
       </Button>
     </div>
-  )
+  );
 }
