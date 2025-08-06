@@ -80,10 +80,10 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
       isActive: pathname === "/admin",
     },
     {
-      title: "ChatLogs",
+      title: "Chat Logs",
       icon: Stethoscope,
       href: "/admin/chatLogs",
-      isActive: pathname === "/admin/chatLogs", // Fixed: removed trailing space
+      isActive: pathname === "/admin/chatLogs",
       badge: waitingPatients > 0 ? waitingPatients : undefined,
     },
     {

@@ -803,61 +803,63 @@ function LiveChatContent() {
             </CardHeader>
 
             {/* Chat Messages */}
-            <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.length === 0 && (
-                <div className="text-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-                  <p className="text-gray-500 dark:text-gray-400">Connecting to Dr. Nitin Mishra...</p>
-                </div>
-              )}
+            <CardContent className="flex-1 p-0">
+              <div className="h-[calc(100vh-280px)] overflow-y-auto p-4 space-y-4">
+                {messages.length === 0 && (
+                  <div className="text-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+                    <p className="text-gray-500 dark:text-gray-400">Connecting to Dr. Nitin Mishra...</p>
+                  </div>
+                )}
 
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.senderEmail === user?.email ? "justify-end" : "justify-start"} mb-2`}
-                >
+                {messages.map((msg) => (
                   <div
-                    className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg shadow-sm ${msg.senderEmail === user?.email
+                    key={msg.id}
+                    className={`flex ${msg.senderEmail === user?.email ? "justify-end" : "justify-start"} mb-2`}
+                  >
+                    <div
+                      className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg shadow-sm ${msg.senderEmail === user?.email
                         ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white"
                         : msg.senderEmail === "system"
                           ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700"
                           : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border dark:border-gray-700"
-                      }`}
-                  >
-                    {msg.text && <p className="text-sm leading-relaxed">{msg.text}</p>}
+                        }`}
+                    >
+                      {msg.text && <p className="text-sm leading-relaxed">{msg.text}</p>}
 
-                    {msg.mediaUrl && msg.mediaType === "image" && (
-                      <img
-                        src={msg.mediaUrl || "/placeholder.svg"}
-                        alt={msg.fileName || "Uploaded image"}
-                        className="mt-2 rounded-md max-w-full max-h-64 object-contain"
-                      />
-                    )}
-                    {msg.mediaUrl && msg.mediaType === "video" && (
-                      <video
-                        controls
-                        src={msg.mediaUrl}
-                        className="mt-2 rounded-md max-w-full max-h-64 object-contain"
-                      />
-                    )}
-                    {msg.mediaUrl && msg.mediaType === "file" && (
-                      <a
-                        href={msg.mediaUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 underline text-sm block text-white"
-                      >
-                        📎 {msg.fileName || "File"}
-                      </a>
-                    )}
+                      {msg.mediaUrl && msg.mediaType === "image" && (
+                        <img
+                          src={msg.mediaUrl || "/placeholder.svg"}
+                          alt={msg.fileName || "Uploaded image"}
+                          className="mt-2 rounded-md max-w-full max-h-64 object-contain"
+                        />
+                      )}
+                      {msg.mediaUrl && msg.mediaType === "video" && (
+                        <video
+                          controls
+                          src={msg.mediaUrl}
+                          className="mt-2 rounded-md max-w-full max-h-64 object-contain"
+                        />
+                      )}
+                      {msg.mediaUrl && msg.mediaType === "file" && (
+                        <a
+                          href={msg.mediaUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 underline text-sm block text-white"
+                        >
+                          📎 {msg.fileName || "File"}
+                        </a>
+                      )}
 
-                    <p className="text-xs mt-1 opacity-70">
-                      {msg.timestamp?.toLocaleTimeString?.() ?? new Date().toLocaleTimeString()}
-                    </p>
+                      <p className="text-xs mt-1 opacity-70">
+                        {msg.timestamp?.toLocaleTimeString?.() ?? new Date().toLocaleTimeString()}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
-              <div ref={bottomRef} />
+                ))}
+                <div ref={bottomRef} />
+              </div>
             </CardContent>
 
             {/* Message Input */}
