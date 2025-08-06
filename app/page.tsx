@@ -41,38 +41,31 @@ export default function HomePage() {
 
   const [checkingRedirect, setCheckingRedirect] = useState(true);
 
-  useEffect(() => {
-  const role = localStorage.getItem("role");
-  if (role === "admin") {
-    router.replace("/admin");
-  } else if (role === "reception") {
-    router.replace("/reception/overview");
-  }
-  }, []);
-  
-  useEffect(() => {
-    if (user && userData?.role) {
-      if (userData.role === "admin") {
-        router.replace("/admin");
-      } else if (userData.role === "receptionist") {
-        router.replace("/reception");
-      } else {
-        setCheckingRedirect(false); // ✅ No special role, render homepage
-      }
-    }
-  }, [user, userData, router]);
 
-  useEffect(() => {
-    if (user && userData?.role) {
-      if (userData.role === "admin") {
-        router.replace("/admin");
-      } else if (userData.role === "receptionist") {
-        router.replace("/reception");
-      } else {
-        setCheckingRedirect(false); // ✅ No special role, render homepage
-      }
+// page.tsx (inside HomePage component)
+useEffect(() => {
+    if (loading) {
+      return; // Wait for auth state to resolve
     }
-  }, [user, userData, router]);
+
+    if (!user) {
+      // Non-authenticated user: Clear stale data and show homepage
+      localStorage.removeItem("role");
+      document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+      setCheckingRedirect(false);
+      return;
+    }
+
+    // Authenticated user: Redirect based on role
+    if (userData?.role === "admin") {
+      router.replace("/admin");
+    } else if (userData?.role === "receptionist") {
+      router.replace("/reception");
+    } else {
+      // Regular user (e.g., patient) or no role: Stay on homepage
+      setCheckingRedirect(false);
+    }
+  }, [user, userData, loading, router]);
 
   if (checkingRedirect || loading) {
     return (
@@ -84,15 +77,16 @@ export default function HomePage() {
 
   const handleLogout = async () => {
     try {
-      localStorage.removeItem("role");
       await logoutUser();
-      router.push("/login"); // Redirect to login page after logout
+      // Call API to clear token cookie server-side
+      await fetch("/api/logout", { method: "POST" });
+      localStorage.removeItem("role");
+      router.push("/login");
     } catch (error) {
       console.error("Logout error:", error);
     }
   };
 
-  // Handle chat button click with authentication check
   const handleChatClick = () => {
     if (user) {
       router.push("/chat");
@@ -102,14 +96,13 @@ export default function HomePage() {
   };
 
   const scrollServices = (direction: "left" | "right") => {
-    const maxScroll = Math.max(0, services.length - 3)
+    const maxScroll = Math.max(0, services.length - 3);
     if (direction === "left") {
-      setServiceScrollPosition(Math.max(0, serviceScrollPosition - 1))
+      setServiceScrollPosition(Math.max(0, serviceScrollPosition - 1));
     } else {
-      setServiceScrollPosition(Math.min(maxScroll, serviceScrollPosition + 1))
+      setServiceScrollPosition(Math.min(maxScroll, serviceScrollPosition + 1));
     }
-  }
-
+  };
   // Update the services array with image URLs
   const services = [
     {
