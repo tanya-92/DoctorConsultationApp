@@ -165,34 +165,66 @@ function LiveChatContent() {
   }
 
   const handleEndConsultation = async () => {
-  if (
-    window.confirm(
-      "Are you sure you want to end this consultation? This will end the current active session.",
-    )
-  ) {
-    try {
-      if (roomId && patientEmailFromUrl) {
-        const activeChatsRef = collection(db, "activeChats")
-        const q = query(activeChatsRef, where("patientEmail", "==", patientEmailFromUrl), where("status", "==", "active"))
-        const snapshot = await getDocs(q)
-        const deletePromises = snapshot.docs.map((doc) => deleteDoc(doc.ref))
-        await Promise.all(deletePromises)
+    if (
+      window.confirm(
+        "Are you sure you want to end this consultation? This will end the current active session."
+      )
+    ) {
+      try {
+        if (roomId && patientEmailFromUrl) {
+          // Calculate duration
+          const activeChatsRef = collection(db, "activeChats")
+          const q = query(activeChatsRef, where("patientEmail", "==", patientEmailFromUrl), where("status", "==", "active"))
+          const snapshot = await getDocs(q)
+          let duration = "0 min"
+          let startTime = ""
+          if (!snapshot.empty) {
+            const chatData = snapshot.docs[0].data()
+            const startTimestamp = chatData.timestamp?.toDate()
+            if (startTimestamp) {
+              const endTime = new Date()
+              const durationMs = endTime.getTime() - startTimestamp.getTime()
+              duration = `${Math.round(durationMs / 60000)} min`
+              startTime = startTimestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }
+          }
+
+          // Add to chatLogs collection
+          await addDoc(collection(db, "chatLogs"), {
+            id: roomId,
+            patient: preFormData.name || patientEmailFromUrl.split("@")[0],
+            doctor: "Dr. Nitin Mishra",
+            date: new Date().toISOString().split("T")[0],
+            startTime: startTime || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            endTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            duration,
+            type: "chat",
+            status: "completed",
+            messageCount: messages.length,
+            attachments: messages.filter((msg) => msg.mediaUrl).length,
+            lastMessage: messages[messages.length - 1]?.text || "No messages",
+            timestamp: serverTimestamp(),
+          })
+
+          // Delete from activeChats
+          const deletePromises = snapshot.docs.map((doc) => deleteDoc(doc.ref))
+          await Promise.all(deletePromises)
+        }
+
+        setMessages([])
+        setMessage("")
+        setSelectedFile(null)
+        router.push("/admin/chat")
+      } catch (err) {
+        console.error("Error ending consultation: ", err)
+        toast({
+          title: "Error",
+          description: "Failed to end consultation. Please try again or contact support.",
+          variant: "destructive",
+        })
       }
-      
-      setMessages([])
-      setMessage("")
-      setSelectedFile(null)
-      router.push("/admin/chat")
-    } catch (err) {
-      console.error("Error ending consultation: ", err)
-      toast({
-        title: "Error",
-        description: "Failed to end consultation. Please try again or contact support.",
-        variant: "destructive",
-      })
     }
   }
-}
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
