@@ -41,9 +41,8 @@ export default function HomePage() {
 
   const [checkingRedirect, setCheckingRedirect] = useState(true);
 
-
-// page.tsx (inside HomePage component)
-useEffect(() => {
+  // Fixed redirect logic
+  useEffect(() => {
     if (loading) {
       return; // Wait for auth state to resolve
     }
@@ -56,21 +55,33 @@ useEffect(() => {
       return;
     }
 
-    // Authenticated user: Redirect based on role
-    if (userData?.role === "admin") {
+    // Authenticated user: Check for admin email first
+    const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "drnitinmishraderma@gmail.com";
+    
+    if (user.email === ADMIN_EMAIL) {
       router.replace("/admin");
-    } else if (userData?.role === "receptionist") {
-      router.replace("/reception");
-    } else {
-      // Regular user (e.g., patient) or no role: Stay on homepage
-      setCheckingRedirect(false);
+      return;
     }
+
+    // Then check userData role
+    if (userData?.role === "receptionist") {
+      router.replace("/reception");
+      return;
+    }
+
+    // Regular user (patient) or no specific role: Stay on homepage
+    setCheckingRedirect(false);
   }, [user, userData, loading, router]);
 
   if (checkingRedirect || loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-xl font-semibold">Redirecting...</p>
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-teal-50 via-white to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-r from-indigo-600 to-teal-600 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Stethoscope className="h-8 w-8 text-white" />
+          </div>
+          <p className="text-xl font-semibold text-gray-700 dark:text-gray-300">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -103,6 +114,7 @@ useEffect(() => {
       setServiceScrollPosition(Math.min(maxScroll, serviceScrollPosition + 1));
     }
   };
+
   // Update the services array with image URLs
   const services = [
     {
@@ -110,42 +122,42 @@ useEffect(() => {
       description:
         "In Our Clinic, We use the latest laser machine which uses state-of-the-art to remove unwanted hair and with greater speed and comfort than other methods. Each laser pulse can treat multiple hairs in a fraction of a second, making treatments quick.",
       icon: "✨",
-      image: "/laserhairremoval.jpg", // Replace with your image path or URL
+      image: "/laserhairremoval.jpg",
     },
     {
       title: "Chemical Peeling",
       description:
         "Chemical peels is best method for skin tightening and skin whitening. Chemical peels uses a chemical solution to improve and smooth the texture of the facial skin by removing its damaged outer layer, recovery varies by peel depth.",
       icon: "🧴",
-      image: "/chemicalpeeling.jpg", // Replace with your image path or URL
+      image: "/chemicalpeeling.jpg",
     },
     {
       title: "Vitiligo Surgery",
       description:
         "Vitiligo is a chronic skin disorder that causes areas of skin to lose colour. It presents as depigmented (white) patches. The goal of vitiligo surgery is to achieve Cultured and Non Cultured Melanocyte Transfer, Blister Grafting, Punch Grafting, Split Thickness etc.",
       icon: "🏥",
-      image: "/vitiligo.jpg", // Replace with your image path or URL
+      image: "/vitiligo.jpg",
     },
     {
       title: "Electro Surgery",
       description:
         "Electro surgery refers to the cutting and coagulation of tissue using high-frequency electrical current. In addition, they should understand the mechanism of action, recovery time varies depending on the size and depth of the treated area",
       icon: "⚡",
-      image: "/electrosurgery.jpeg", // Replace with your image path or URL
+      image: "/electrosurgery.jpeg",
     },
     {
       title: "Radio Frequency Surgery",
       description:
         "At Our Clinic, all these problems can be cured in one sitting with the help of latest and innovative RADIO FREQUENCY MACHINE. This machine removes the unwanted mole, skin tags, sun spots, warts without any scarring and with no or very minimal bleeding.",
       icon: "📡",
-      image: "/radiofrequency.jpeg", // Replace with your image path or URL
+      image: "/radiofrequency.jpeg",
     },
     {
       title: "Acne Surgery",
       description:
         "Acne or pimples is a common teenage problem. Medically acne problem is categorized into active acne (comedons, white heads, black heads), acne pigment (red, brown and black) and acne scars (atrophic, hypertrophic and ice-pick).",
       icon: "🎯",
-      image: "/acnesurgery.jpeg", // Replace with your image path or URL
+      image: "/acnesurgery.jpeg",
     },
   ];
 
@@ -312,7 +324,6 @@ useEffect(() => {
         </div>
       </header>
 
-      {/* Hero Section */}
       <section className="relative py-20 pb-32 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-teal-600/10"></div>
         <div className="container mx-auto px-4 relative">

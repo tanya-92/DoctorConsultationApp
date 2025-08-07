@@ -38,24 +38,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (user) {
         try {
+          // Set token cookie when user is authenticated
+          const token = await user.getIdToken();
+          await fetch("/api/setToken", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ token }),
+          });
+
           const data = await getUserData(user.uid);
           setUserData(data);
 
           if (data?.role) {
             localStorage.setItem("role", data.role);
           } else {
-            localStorage.removeItem("role");
+            // For users without a role in Firestore, don't clear everything
+            // They might be valid users who just don't have a role assigned yet
+            console.log("User has no role assigned");
           }
         } catch (error) {
           console.error("Error fetching user data:", error);
+          // Don't clear everything on error, just set userData to null
           setUserData(null);
-          localStorage.removeItem("role");
-          document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+          // Only clear token if it's actually invalid
+          if (error instanceof Error && error.message.includes("not found")) {
+            localStorage.removeItem("role");
+            document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+          }
         }
       } else {
+        // User is not authenticated
         setUserData(null);
         localStorage.removeItem("role");
-        document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+        // Clear token cookie when user logs out
+        try {
+          await fetch("/api/logout", { method: "POST" });
+        } catch (error) {
+          // Fallback to client-side cookie clearing
+          document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+        }
       }
 
       setLoading(false);

@@ -39,6 +39,13 @@ export default function Login() {
     setMounted(true);
   }, []);
 
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (user) {
+      router.push("/");
+    }
+  }, [user, router]);
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -65,6 +72,8 @@ export default function Login() {
       const userCredential = await loginUser(formData.email, formData.password);
       const user = userCredential;
       const token = await user.getIdToken();
+      
+      // Set token cookie
       await fetch("/api/setToken", {
         method: "POST",
         headers: {
@@ -73,26 +82,33 @@ export default function Login() {
         body: JSON.stringify({ token }),
       });
 
+      // Check admin email first
       const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "drnitinmishraderma@gmail.com";
       if (user.email === ADMIN_EMAIL) {
         router.push("/admin");
         return;
       }
 
+      // Get user data from Firestore
       const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
 
-      if (!docSnap.exists()) {
-        throw new Error("User profile not found in Firestore");
-      }
+      if (docSnap.exists()) {
+        const userData = docSnap.data();
+        const role = userData.role;
+        
+        if (role) {
+          localStorage.setItem("role", role);
+        }
 
-      const userData = docSnap.data();
-      const role = userData.role;
-      localStorage.setItem("role", role);
-
-      if (role === "receptionist") {
-        router.push("/reception");
+        if (role === "receptionist") {
+          router.push("/reception");
+        } else {
+          router.push("/");
+        }
       } else {
+        // User exists in Auth but not in Firestore - still allow login
+        console.log("User not found in Firestore, redirecting to homepage");
         router.push("/");
       }
     } catch (error: any) {
@@ -104,6 +120,10 @@ export default function Login() {
         message = "User not found. Please check your email.";
       } else if (error.code === "auth/too-many-requests") {
         message = "Too many login attempts. Please try again later.";
+      } else if (error.code === "auth/invalid-email") {
+        message = "Invalid email format.";
+      } else if (error.code === "auth/user-disabled") {
+        message = "This account has been disabled.";
       }
 
       setError(message);

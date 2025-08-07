@@ -6,21 +6,17 @@ const protectedRoutes = ["/admin", "/reception"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const token = request.cookies.get("token")?.value;
 
   const isProtected = protectedRoutes.some((route) =>
     pathname.startsWith(route)
   );
 
-  if (!isProtected) return NextResponse.next();
-
-  const token = request.cookies.get("token")?.value;
-
-  if (!token) {
-    // Redirect to login if no token found
+  if (isProtected && !token) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  return NextResponse.next(); // Allow if token is present
+  return NextResponse.next();
 }
 
 export const config = {
