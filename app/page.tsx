@@ -210,12 +210,6 @@ export default function HomePage() {
                 Gallery
               </Link>
               <Link
-                href="/contact"
-                className={`${darkMode ? "text-gray-300 hover:text-white" : "text-gray-600 hover:text-indigo-600"} transition-colors`}
-              >
-                Contact
-              </Link>
-              <Link
                 href="/why-choose-us"
                 className={`${darkMode ? "text-gray-300 hover:text-white" : "text-gray-600 hover:text-indigo-600"} transition-colors`}
               >

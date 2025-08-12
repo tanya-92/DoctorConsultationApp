@@ -1,6 +1,5 @@
 // layout.tsx
 import { ThemeProvider } from 'next-themes'
-import { DarkModeInitializer } from "@/components/dark-mode-initializer"
 import type { Metadata, Viewport } from "next"
 import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
@@ -40,7 +39,6 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <DarkModeProvider>
-            <DarkModeInitializer /> {/* Add this line */}
             <ThemeProvider
               attribute="class"
               defaultTheme="system"
