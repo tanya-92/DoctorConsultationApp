@@ -141,28 +141,56 @@ function LiveChatContent() {
   }
 
   const handleCall = async (type: "audio" | "video") => {
-    if (!roomId || !currentUser?.email) return
-    const NEXT_PUBLIC_TOKEN_BASE_URL = process.env.NEXT_PUBLIC_TOKEN_BASE_URL
+    if (!roomId || !currentUser?.email || !userRole) return;
+    const NEXT_PUBLIC_TOKEN_BASE_URL = process.env.NEXT_PUBLIC_TOKEN_BASE_URL;
     if (!NEXT_PUBLIC_TOKEN_BASE_URL) {
-      console.error("NEXT_PUBLIC_TOKEN_BASE_URL is not set.")
-      return
+      console.error("NEXT_PUBLIC_TOKEN_BASE_URL is not set.");
+      toast({
+        title: "Error",
+        description: "Token base URL is not configured.",
+        variant: "destructive",
+      });
+      return;
     }
 
     try {
       const response = await fetch(
-        `${NEXT_PUBLIC_TOKEN_BASE_URL}?channelName=${roomId}&uid=${currentUser.email}&role=publisher`,
-      )
-      const { token } = await response.json()
-      router.push(`/call?channel=${roomId}&uid=${currentUser.email}&token=${token}&type=${type}`)
+        `${NEXT_PUBLIC_TOKEN_BASE_URL}?channelName=${roomId}&uid=doctor_${currentUser.email}&role=doctor`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch token");
+      }
+      const { token } = await response.json();
+
+      // Create a new call document in Firestore
+      const callRef = await addDoc(collection(db, "activeCalls"), {
+        patientEmail: patientEmailFromUrl,
+        patientName: preFormData.name || patientEmailFromUrl?.split("@")[0] || "Patient",
+        patientUid: "", // You may need to fetch this if required
+        callType: type,
+        status: "waiting",
+        createdAt: serverTimestamp(),
+        channelName: roomId,
+        urgency: preFormData.urgency || "NA",
+      });
+
+      // Redirect to admin call page with necessary parameters
+      const queryParams = new URLSearchParams({
+        channel: roomId,
+        type,
+        callId: callRef.id,
+        ...(patientEmailFromUrl ? { patientEmail: patientEmailFromUrl } : {}),
+      });
+      router.push(`/admin/call?${queryParams.toString()}`);
     } catch (err) {
-      console.error("Failed to fetch Agora token", err)
+      console.error("Failed to initiate call:", err);
       toast({
         title: "Error",
         description: "Failed to initiate call. Please try again.",
         variant: "destructive",
-      })
+      });
     }
-  }
+  };
 
   const handleEndConsultation = async () => {
     if (
@@ -400,10 +428,10 @@ function LiveChatContent() {
                   >
                     <div
                       className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg shadow-sm ${msg.senderEmail === currentUser?.email
-                          ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white"
-                          : msg.senderEmail === "system"
-                            ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700"
-                            : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border dark:border-gray-700"
+                        ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white"
+                        : msg.senderEmail === "system"
+                          ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border border-yellow-200 dark:border-yellow-700"
+                          : "bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border dark:border-gray-700"
                         }`}
                     >
                       {msg.text && <p className="text-sm leading-relaxed">{msg.text}</p>}

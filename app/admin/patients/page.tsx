@@ -244,7 +244,7 @@ export default function PatientsPage() {
           chiefComplaint = data.description
         }
 
-        const key = email || contactNumber || doc.id
+        const key = doc.id
 
         if (!patientsMap.has(key)) {
           patientsMap.set(key, {

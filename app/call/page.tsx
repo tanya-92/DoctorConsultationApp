@@ -29,6 +29,8 @@ import {
   collection,
   deleteDoc,
   serverTimestamp,
+  setDoc,
+  getDoc,
 } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
 
@@ -62,45 +64,39 @@ const PatientCallPage = () => {
   const [callStatus, setCallStatus] = useState<string>("waiting");
 
   useEffect(() => {
-    const createCallIfNeeded = async () => {
-      if (!user || callId) return;
+  const createCallIfNeeded = async () => {
+    if (!user || callId) return;
 
-      // Step 1: Query Firestore for any active call by this patient
-      const q = query(
-        collection(db, "activeCalls"),
-        where("patientEmail", "==", user.email),
-        where("status", "in", ["waiting", "connected"])
-      );
+    const callDocRef = doc(db, "activeCalls", user.uid); // doc ID = patientUid
+    const existing = await getDoc(callDocRef);
 
-      const snapshot = await getDocs(q);
+    if (existing.exists()) {
+      console.log("Active call already exists:", existing.id);
+      return; // Prevent duplicate
+    }
 
-      // Step 2: If a call already exists, don't create another
-      if (!snapshot.empty) {
-        alert("You already have an active call. Please wait for the doctor.");
-        return;
-      }
+    const newChannelName = uuidv4();
 
-      // Step 3: Create the call only if no existing call is found
-      const newCallRef = await addDoc(collection(db, "activeCalls"), {
-        patientName: user.displayName || "Patient",
-        patientEmail: user.email || "",
-        patientPhone: "",
-        patientUid: user.uid,
-        callType,
-        status: "waiting",
-        createdAt: serverTimestamp(),
-        channelName: channelName || uuidv4(),
-        urgency: "NA",
-      });
+    await setDoc(callDocRef, {
+      patientName: user.displayName || "Patient",
+      patientEmail: user.email || "",
+      patientPhone: "",
+      patientUid: user.uid,
+      callType,
+      status: "waiting",
+      createdAt: serverTimestamp(),
+      channelName: newChannelName,
+      urgency: "NA",
+    });
 
-      // Step 4: Redirect to same page with callId in URL
-      router.replace(
-        `/call?page=1&type=${callType}&channel=${channelName}&callId=${newCallRef.id}`
-      );
-    };
+    router.replace(
+      `/call?page=1&type=${callType}&channel=${newChannelName}&callId=${user.uid}`
+    );
+  };
 
-    createCallIfNeeded();
-  }, [user, callId]);
+  createCallIfNeeded();
+}, [user, callId]);
+
 
   useEffect(() => {
     if (!channelName || !callId) return;
@@ -260,25 +256,34 @@ const PatientCallPage = () => {
       // Calculate call duration
       const duration = callStartTimeRef.current
         ? Math.floor(
-            (new Date().getTime() - callStartTimeRef.current.getTime()) / 1000
-          )
+          (new Date().getTime() - callStartTimeRef.current.getTime()) / 1000
+        )
         : 0;
 
       // Move to call logs and remove from active calls
       if (callId) {
         try {
           // Add to call logs
-          await addDoc(collection(db, "callLogs"), {
-            patientName: user?.displayName || "Patient",
-            patientEmail: user?.email || "patient@example.com",
-            callType,
-            duration,
-            startTime: callStartTimeRef.current
-              ? new Date(callStartTimeRef.current)
-              : new Date(),
-            endTime: serverTimestamp(),
-            status: "completed",
-          });
+          const logsRef = collection(db, "callLogs");
+          const existingLogs = await getDocs(
+            query(logsRef, where("callId", "==", callId))
+          );
+
+          if (existingLogs.empty) {
+            await addDoc(logsRef, {
+              callId,
+              patientName: user?.displayName || "Patient",
+              patientEmail: user?.email || "patient@example.com",
+              callType,
+              duration,
+              startTime: callStartTimeRef.current
+                ? new Date(callStartTimeRef.current)
+                : new Date(),
+              endTime: serverTimestamp(),
+              status: "completed",
+            });
+          }
+
 
           // Remove from active calls
           await deleteDoc(doc(db, "activeCalls", callId));
@@ -364,24 +369,22 @@ const PatientCallPage = () => {
           <div className="flex items-center space-x-4">
             <Badge
               variant="secondary"
-              className={`${
-                connectionStatus === "Connected" ||
-                connectionStatus === "Connected with doctor"
+              className={`${connectionStatus === "Connected" ||
+                  connectionStatus === "Connected with doctor"
                   ? "bg-green-500/20 text-green-300 border-green-500/30"
                   : callStatus === "waiting"
-                  ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
-                  : "bg-red-500/20 text-red-300 border-red-500/30"
-              }`}
+                    ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
+                    : "bg-red-500/20 text-red-300 border-red-500/30"
+                }`}
             >
               <div
-                className={`w-2 h-2 rounded-full mr-2 ${
-                  connectionStatus === "Connected" ||
-                  connectionStatus === "Connected with doctor"
+                className={`w-2 h-2 rounded-full mr-2 ${connectionStatus === "Connected" ||
+                    connectionStatus === "Connected with doctor"
                     ? "bg-green-400 animate-pulse"
                     : callStatus === "waiting"
-                    ? "bg-yellow-400 animate-pulse"
-                    : "bg-red-400"
-                }`}
+                      ? "bg-yellow-400 animate-pulse"
+                      : "bg-red-400"
+                  }`}
               ></div>
               {connectionStatus}
             </Badge>
@@ -542,14 +545,13 @@ const PatientCallPage = () => {
               <CardContent className="text-center space-y-6">
                 <div className="flex items-center justify-center space-x-2 text-sm">
                   <div
-                    className={`w-3 h-3 rounded-full ${
-                      connectionStatus === "Connected" ||
-                      connectionStatus === "Connected with doctor"
+                    className={`w-3 h-3 rounded-full ${connectionStatus === "Connected" ||
+                        connectionStatus === "Connected with doctor"
                         ? "bg-green-500 animate-pulse"
                         : callStatus === "waiting"
-                        ? "bg-yellow-500 animate-pulse"
-                        : "bg-red-500"
-                    }`}
+                          ? "bg-yellow-500 animate-pulse"
+                          : "bg-red-500"
+                      }`}
                   ></div>
                   <span>{connectionStatus}</span>
                 </div>

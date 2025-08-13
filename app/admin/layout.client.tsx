@@ -18,7 +18,7 @@ import {
   SidebarTrigger,
   SidebarInset,
 } from "@/components/ui/sidebar"
-import { LayoutDashboard, Calendar, Users, DollarSign, LogOut, Bell, Stethoscope, Phone } from "lucide-react"
+import { LayoutDashboard, Calendar, Users, DollarSign, LogOut, Bell, Stethoscope, Phone, MessageCircle, Logs } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -80,17 +80,23 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
       isActive: pathname === "/admin",
     },
     {
-      title: "Chat Logs",
-      icon: Stethoscope,
-      href: "/admin/chatLogs",
-      isActive: pathname === "/admin/chatLogs",
-      badge: waitingPatients > 0 ? waitingPatients : undefined,
+      title: "Chats",
+      icon: MessageCircle,
+      href: "/admin/chat",
+      isActive: pathname === "/admin/chat",
     },
     {
       title: "Calls",
       icon: Phone,
       href: "/admin/calls",
-      isActive: pathname === "/admin/call",
+      isActive: pathname === "/admin/calls",
+    },
+    {
+      title: "Logs",
+      icon: Logs,
+      href: "/admin/Logs",
+      isActive: pathname === "/admin/Logs",
+      badge: waitingPatients > 0 ? waitingPatients : undefined,
     },
     {
       title: "Appointments",

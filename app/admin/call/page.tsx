@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { useAuthState } from "react-firebase-hooks/auth"
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Users, Clock, ArrowLeft, Loader2 } from "lucide-react"
 import { auth, db } from "@/lib/firebase"
-import { doc, updateDoc, addDoc, collection, deleteDoc, serverTimestamp, onSnapshot } from "firebase/firestore"
+import { doc, updateDoc, addDoc, getDocs, where, query, collection, deleteDoc, serverTimestamp, onSnapshot } from "firebase/firestore"
 
 const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID!
 const tokenBaseURL = process.env.NEXT_PUBLIC_TOKEN_BASE_URL!
@@ -52,7 +52,7 @@ const AdminCallPage = () => {
 
   // Load AgoraRTC dynamically
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const rtc = await import("agora-rtc-sdk-ng")
         setAgoraRTC(rtc)
@@ -163,48 +163,6 @@ const AdminCallPage = () => {
     }
   }
 
-  const leaveCall = async () => {
-    if (clientRef.current && localTracksRef.current) {
-      localTracksRef.current.forEach((track: any) => track.close())
-      await clientRef.current.leave()
-
-      // Calculate call duration
-      const duration = callStartTimeRef.current
-        ? Math.floor((new Date().getTime() - callStartTimeRef.current.getTime()) / 1000)
-        : 0
-
-      // Move to call logs and remove from active calls
-      if (callId && callData) {
-        try {
-          // Add to call logs
-          await addDoc(collection(db, "callLogs"), {
-            patientName: callData.patientName || "Patient",
-            patientEmail: callData.patientEmail || "patient@example.com",
-            callType,
-            duration,
-            startTime: callStartTimeRef.current ? new Date(callStartTimeRef.current) : new Date(),
-            endTime: serverTimestamp(),
-            status: "completed",
-          })
-
-          // Remove from active calls
-          await deleteDoc(doc(db, "activeCalls", callId))
-        } catch (error) {
-          console.error("Error updating call logs:", error)
-        }
-      }
-
-      setJoined(false)
-      setCallDuration(0)
-      setConnectionStatus("Call ended")
-
-      // Redirect back to calls page
-      setTimeout(() => {
-        router.push("/admin/calls")
-      }, 1000)
-    }
-  }
-
   const toggleAudio = () => {
     const audioTrack = localTracksRef.current?.[0]
     if (audioTrack) {
@@ -222,6 +180,50 @@ const AdminCallPage = () => {
       setMutedVideo(!mutedVideo)
     }
   }
+  const leaveCall = async () => {
+    if (clientRef.current && localTracksRef.current) {
+      localTracksRef.current.forEach((track: any) => track.close());
+      await clientRef.current.leave();
+
+      const duration = callStartTimeRef.current
+        ? Math.floor((new Date().getTime() - callStartTimeRef.current.getTime()) / 1000)
+        : 0;
+
+      if (callId && callData) {
+        try {
+          const logsRef = collection(db, "callLogs");
+          const existingLogs = await getDocs(
+            query(logsRef, where("callId", "==", callData.id))
+          );
+
+          if (existingLogs.empty) {
+            await addDoc(logsRef, {
+              callId: callData.id,
+              patientName: callData.patientName,
+              patientUid: callData.patientUid,
+              callType: callData.callType,
+              duration,
+              startTime: callData.createdAt,
+              endTime: serverTimestamp(),
+              status: "cancelled",
+            });
+          }
+        } catch (error) {
+          console.error("Error logging call:", error);
+        }
+
+        setJoined(false);
+        setCallDuration(0);
+        setConnectionStatus("Call ended");
+
+        setTimeout(() => {
+          router.push(`/admin/chat?patientEmail=${callData?.patientEmail || ''}`);
+        }, 1000);
+      }
+    }
+  };
+
+
 
   if (!user || !AgoraRTC) {
     return (
@@ -243,7 +245,7 @@ const AdminCallPage = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push("/admin/calls")}
+              onClick={() => router.push("/admin/chat?patientEmail=${callData?.patientEmail || ''}")}
               className="text-white hover:bg-white/10"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -268,16 +270,14 @@ const AdminCallPage = () => {
           <div className="flex items-center space-x-4">
             <Badge
               variant="secondary"
-              className={`${
-                connectionStatus === "Connected"
-                  ? "bg-green-500/20 text-green-300 border-green-500/30"
-                  : "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
-              }`}
+              className={`${connectionStatus === "Connected"
+                ? "bg-green-500/20 text-green-300 border-green-500/30"
+                : "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
+                }`}
             >
               <div
-                className={`w-2 h-2 rounded-full mr-2 ${
-                  connectionStatus === "Connected" ? "bg-green-400 animate-pulse" : "bg-yellow-400"
-                }`}
+                className={`w-2 h-2 rounded-full mr-2 ${connectionStatus === "Connected" ? "bg-green-400 animate-pulse" : "bg-yellow-400"
+                  }`}
               ></div>
               {connectionStatus}
             </Badge>
@@ -418,9 +418,8 @@ const AdminCallPage = () => {
               <CardContent className="text-center space-y-6">
                 <div className="flex items-center justify-center space-x-2 text-sm">
                   <div
-                    className={`w-3 h-3 rounded-full ${
-                      connectionStatus === "Connected" ? "bg-green-500 animate-pulse" : "bg-yellow-500"
-                    }`}
+                    className={`w-3 h-3 rounded-full ${connectionStatus === "Connected" ? "bg-green-500 animate-pulse" : "bg-yellow-500"
+                      }`}
                   ></div>
                   <span>{connectionStatus}</span>
                 </div>
