@@ -22,8 +22,8 @@ type Appointment = {
   firstName: string
   lastName: string
   phone: string
-  date: Timestamp
-  time: Timestamp
+  date: Timestamp | string
+  time: Timestamp | string
   clinic: string
   urgency: string
   createdAt: Timestamp
@@ -101,26 +101,21 @@ export default function ReceptionOverview() {
     }
   }
 
-  const formatTime = (value: string | Timestamp | null | undefined): string => {
-    try {
-      if (!value) {
-        return "Time not set"
-      }
+const formatTime = (value: string | Timestamp | null | undefined): string => {
+  try {
+    if (!value) return "Time not set";
 
-      const date = getSafeDate(value)
-      if (isNaN(date.getTime())) {
-        return "Invalid Time"
-      }
-
-      return date.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    } catch (error) {
-      console.warn("Error formatting time:", error)
-      return "Invalid Time"
+    if (typeof value === "string") {
+      return value;
     }
+
+    const date = getSafeDate(value);
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "Invalid Time";
   }
+};
+
 
   useEffect(() => {
     const handleInteraction = () => {

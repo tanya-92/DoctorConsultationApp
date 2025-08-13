@@ -49,6 +49,8 @@ interface RecentActivity {
 }
 
 export default function DoctorDashboard() {
+  const [hasNewAppointment, setHasNewAppointment] = useState(false);
+  const [lastNotifiedId, setLastNotifiedId] = useState("");
   const [user] = useAuthState(auth);
   const { role, updateRole, loading: roleLoading } = useUserRole();
   const [stats, setStats] = useState<DashboardStats>({
