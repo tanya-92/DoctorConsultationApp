@@ -1,11 +1,11 @@
-"use client"
-import { useDarkMode } from "@/contexts/dark-mode-context"
+"use client";
+import { useDarkMode } from "@/contexts/dark-mode-context";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useRef } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Clock,
   MapPin,
@@ -22,74 +22,154 @@ import {
   Sun,
   Moon,
   ArrowLeft,
-} from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
-import { logoutUser } from "@/lib/auth"
+  User,
+} from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
+import { logoutUser } from "@/lib/auth";
 
 export default function HomePage() {
-  const { darkMode, toggleDarkMode } = useDarkMode()
+  const { darkMode, toggleDarkMode } = useDarkMode();
   const router = useRouter();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [showServices, setShowServices] = useState(true)
-  const [showGallery, setShowGallery] = useState(false)
-  const [serviceScrollPosition, setServiceScrollPosition] = useState(0)
-  const servicesRef = useRef<HTMLDivElement>(null)
-
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-
-  const { user, userData, loading } = useAuth()
-
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showServices, setShowServices] = useState(true);
+  const [showGallery, setShowGallery] = useState(false);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [serviceScrollPosition, setServiceScrollPosition] = useState(0);
+  const servicesRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { user, userData, loading, updateUser, updateUserPassword } = useAuth();
   const [checkingRedirect, setCheckingRedirect] = useState(true);
 
-  // Fixed redirect logic
+  // Profile form state
+  const [profileForm, setProfileForm] = useState({
+    fullName: userData?.fullName || "",
+    email: user?.email || "",
+    age: userData?.age || 0,
+    phone: userData?.phone || "",
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Redirect logic
   useEffect(() => {
-    if (loading) {
-      return; // Wait for auth state to resolve
-    }
+    if (loading) return;
 
     if (!user) {
-      // Non-authenticated user: Clear stale data and show homepage
       localStorage.removeItem("role");
       document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
       setCheckingRedirect(false);
       return;
     }
 
-    // Authenticated user: Check for admin email first
     const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "drnitinmishraderma@gmail.com";
-    
     if (user.email === ADMIN_EMAIL) {
       router.replace("/admin");
       return;
     }
 
-    // Then check userData role
     if (userData?.role === "receptionist") {
       router.replace("/reception");
       return;
     }
 
-    // Regular user (patient) or no specific role: Stay on homepage
     setCheckingRedirect(false);
   }, [user, userData, loading, router]);
 
-  if (checkingRedirect || loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-teal-50 via-white to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-indigo-600 to-teal-600 rounded-xl flex items-center justify-center mx-auto mb-4 animate-pulse">
-            <Stethoscope className="h-8 w-8 text-white" />
-          </div>
-          <p className="text-xl font-semibold text-gray-700 dark:text-gray-300">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  // Update profile form when userData changes
+  useEffect(() => {
+    if (userData) {
+      setProfileForm((prev) => ({
+        ...prev,
+        fullName: userData.fullName || "",
+        email: user?.email || "",
+        age: userData.age || 0,
+        phone: userData.phone || "",
+      }));
+    }
+  }, [userData, user]);
+
+  // Handle profile form changes
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setProfileForm((prev) => ({
+      ...prev,
+      [name]: name === "age" ? parseInt(value) || 0 : value,
+    }));
+    setFormErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  // Validate profile form
+  const validateForm = () => {
+    const errors: { [key: string]: string } = {};
+    if (!profileForm.fullName.trim()) {
+      errors.fullName = "Full name is required";
+    }
+    if (!profileForm.email.trim()) {
+      errors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(profileForm.email)) {
+      errors.email = "Invalid email format";
+    }
+    if (profileForm.age <= 0) {
+      errors.age = "Age must be a positive number";
+    }
+    if (profileForm.phone && !/^\d{10}$/.test(profileForm.phone)) {
+      errors.phone = "Phone number must be 10 digits";
+    }
+    if (profileForm.newPassword || profileForm.currentPassword || profileForm.confirmPassword) {
+      if (!profileForm.currentPassword) {
+        errors.currentPassword = "Current password is required to change password";
+      }
+      if (!profileForm.newPassword) {
+        errors.newPassword = "New password is required";
+      } else if (profileForm.newPassword.length < 6) {
+        errors.newPassword = "New password must be at least 6 characters";
+      }
+      if (profileForm.newPassword !== profileForm.confirmPassword) {
+        errors.confirmPassword = "Passwords do not match";
+      }
+    }
+    return errors;
+  };
+
+  // Handle profile form submission
+  const handleProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Update user profile data
+      await updateUser({
+        fullName: profileForm.fullName,
+        age: profileForm.age,
+        phone: profileForm.phone || undefined,
+      });
+
+      // Update password if provided
+      if (profileForm.newPassword && profileForm.currentPassword) {
+        await updateUserPassword(profileForm.currentPassword, profileForm.newPassword);
+      }
+
+      setShowProfileSettings(false);
+      alert("Profile updated successfully!");
+    } catch (error: any) {
+      console.error("Profile update error:", error);
+      alert(`Failed to update profile: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
       await logoutUser();
-      // Call API to clear token cookie server-side
       await fetch("/api/logout", { method: "POST" });
       localStorage.removeItem("role");
       router.push("/login");
@@ -115,7 +195,6 @@ export default function HomePage() {
     }
   };
 
-  // Update the services array with image URLs
   const services = [
     {
       title: "Laser Hair Removal",
@@ -161,7 +240,6 @@ export default function HomePage() {
     },
   ];
 
-  // Sample gallery images (replace with your own URLs or local paths)
   const galleryImages = [
     "/clinic2.png",
     "/clinic5.png",
@@ -169,7 +247,7 @@ export default function HomePage() {
     "/clinic4.png",
     "/clinic1.png",
     "/clinic3.png",
-  ]
+  ];
 
   return (
     <div
@@ -177,8 +255,7 @@ export default function HomePage() {
     >
       {/* Header */}
       <header
-        className={`sticky top-0 z-50 backdrop-blur-md border-b transition-all duration-300 ${darkMode ? "bg-slate-900/80 border-slate-700" : "bg-white/80 border-white/20"
-          }`}
+        className={`sticky top-0 z-50 backdrop-blur-md border-b transition-all duration-300 ${darkMode ? "bg-slate-900/80 border-slate-700" : "bg-white/80 border-white/20"}`}
       >
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -225,11 +302,7 @@ export default function HomePage() {
                 className="p-2"
                 aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
               >
-                {darkMode ? (
-                  <Sun className="h-4 w-4" />
-                ) : (
-                  <Moon className="h-4 w-4" />
-                )}
+                {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
 
               {user ? (
@@ -237,6 +310,15 @@ export default function HomePage() {
                   <span className="text-sm text-gray-600 dark:text-gray-300">
                     Welcome, {userData?.fullName || user.displayName}
                   </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowProfileSettings(true)}
+                    className="p-2"
+                    aria-label="Profile Settings"
+                  >
+                    <User className="h-4 w-4" />
+                  </Button>
                   <Button variant="outline" onClick={handleLogout}>
                     Logout
                   </Button>
@@ -275,8 +357,7 @@ export default function HomePage() {
           {/* Mobile Menu */}
           {mobileMenuOpen && (
             <div
-              className={`md:hidden mt-4 p-4 rounded-lg backdrop-blur-md ${darkMode ? "bg-slate-800/90" : "bg-white/90"
-                }`}
+              className={`md:hidden mt-4 p-4 rounded-lg backdrop-blur-md ${darkMode ? "bg-slate-800/90" : "bg-white/90"}`}
             >
               <nav className="flex flex-col space-y-3">
                 <Link href="/" className="text-indigo-600 font-medium">
@@ -297,6 +378,14 @@ export default function HomePage() {
                       <span className="text-sm text-gray-600 dark:text-gray-300">
                         Welcome, {userData?.fullName || user.displayName}
                       </span>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowProfileSettings(true)}
+                        className="w-full bg-transparent flex items-center justify-center"
+                      >
+                        <User className="h-4 w-4 mr-2" />
+                        Profile Settings
+                      </Button>
                       <Button variant="outline" onClick={handleLogout} className="w-full bg-transparent">
                         Logout
                       </Button>
@@ -318,6 +407,7 @@ export default function HomePage() {
         </div>
       </header>
 
+      {/* Hero Section */}
       <section className="relative py-20 pb-32 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/10 to-teal-600/10"></div>
         <div className="container mx-auto px-4 relative">
@@ -326,8 +416,7 @@ export default function HomePage() {
               <div className="space-y-4">
                 <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200">20+ Years Experience</Badge>
                 <h1
-                  className={`text-4xl md:text-6xl font-bold leading-tight ${darkMode ? "text-white" : "text-gray-900"
-                    }`}
+                  className={`text-4xl md:text-6xl font-bold leading-tight ${darkMode ? "text-white" : "text-gray-900"}`}
                 >
                   Expert Skin Care with{" "}
                   <span className="bg-gradient-to-r from-indigo-600 to-teal-600 bg-clip-text text-transparent">
@@ -355,10 +444,9 @@ export default function HomePage() {
                   size="lg"
                   variant="outline"
                   onClick={handleChatClick}
-                  className={`text-lg px-8 py-4 backdrop-blur-sm ${darkMode
-                    ? "border-gray-600 text-gray-300 hover:bg-gray-800"
-                    : "border-white/20 bg-white/10 hover:bg-white/20"
-                    }`}
+                  className={`text-lg px-8 py-4 backdrop-blur-sm ${
+                    darkMode ? "border-gray-600 text-gray-300 hover:bg-gray-800" : "border-white/20 bg-white/10 hover:bg-white/20"
+                  }`}
                 >
                   Start Live Chat
                 </Button>
@@ -382,7 +470,6 @@ export default function HomePage() {
 
             <div className="relative z-10 flex justify-center">
               <div className="relative group">
-                {/* Beautiful border container */}
                 <div className="relative p-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-teal-500 rounded-3xl shadow-2xl group-hover:shadow-3xl transition-all duration-300">
                   <div className="bg-white rounded-2xl p-1 shadow-inner">
                     <img
@@ -391,7 +478,6 @@ export default function HomePage() {
                       className="rounded-xl w-full max-w-md mx-auto object-cover shadow-lg group-hover:scale-[1.02] transition-transform duration-300"
                       style={{ aspectRatio: "4/3", height: "auto", minHeight: "350px" }}
                     />
-                    {/* Text Box Below Image */}
                     <div
                       className={`text-center p-4 rounded-b-xl ${darkMode ? "bg-slate-800/95 text-white" : "bg-white/95 text-gray-900"} backdrop-blur-md border-t ${darkMode ? "border-slate-700" : "border-gray-200"}`}
                     >
@@ -401,8 +487,6 @@ export default function HomePage() {
                     </div>
                   </div>
                 </div>
-
-                {/* Decorative elements */}
                 <div className="absolute -top-4 -right-4 w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full animate-pulse shadow-lg"></div>
                 <div className="absolute -bottom-4 -left-4 w-6 h-6 bg-gradient-to-r from-pink-400 to-red-500 rounded-full animate-pulse shadow-lg"></div>
                 <div className="absolute top-1/2 -left-8 w-4 h-4 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full animate-bounce shadow-lg"></div>
@@ -490,7 +574,6 @@ export default function HomePage() {
               {showServices ? "Hide Services" : "View Services"}
             </Button>
 
-            {/* Interactive Service Cards */}
             {showServices && (
               <div className="mt-12 relative">
                 <div className="flex items-center justify-center space-x-4 mb-6">
@@ -521,8 +604,9 @@ export default function HomePage() {
                     {services.map((service, index) => (
                       <div
                         key={index}
-                        className={`min-w-[350px] group shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border-0 rounded-xl p-6 ${darkMode ? "bg-slate-800/50 backdrop-blur-sm" : "bg-white/70 backdrop-blur-sm"
-                          }`}
+                        className={`min-w-[350px] group shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-300 border-0 rounded-xl p-6 ${
+                          darkMode ? "bg-slate-800/50 backdrop-blur-sm" : "bg-white/70 backdrop-blur-sm"
+                        }`}
                       >
                         <div className="text-center">
                           <div className="text-4xl mb-4">{service.icon}</div>
@@ -531,7 +615,7 @@ export default function HomePage() {
                             alt={service.title}
                             className="w-full h-32 object-cover rounded-lg mb-4"
                             onError={(e) => {
-                              e.currentTarget.src = "/placeholder.svg?height=150&width=300"; // Fallback image
+                              e.currentTarget.src = "/placeholder.svg?height=150&width=300";
                             }}
                           />
                           <h3 className={`text-xl font-semibold mb-3 ${darkMode ? "text-white" : "text-blue-900"}`}>
@@ -574,8 +658,9 @@ export default function HomePage() {
             {galleryImages.slice(0, 3).map((image, index) => (
               <Card
                 key={index}
-                className={`group cursor-pointer hover:shadow-xl transition-all duration-300 border-0 overflow-hidden ${darkMode ? "bg-slate-800/50 backdrop-blur-sm" : "bg-white/70 backdrop-blur-sm"
-                  }`}
+                className={`group cursor-pointer hover:shadow-xl transition-all duration-300 border-0 overflow-hidden ${
+                  darkMode ? "bg-slate-800/50 backdrop-blur-sm" : "bg-white/70 backdrop-blur-sm"
+                }`}
                 onClick={() => setShowGallery(true)}
               >
                 <div className="relative">
@@ -742,7 +827,7 @@ export default function HomePage() {
               </p>
               <div className="flex space-x-4">
                 <Phone className="h-5 w-5 text-gray-400" />
-                <span className="text-gray-400">9258924611</span>
+                <span className="text-gray-400">925892461 certificato1</span>
               </div>
             </div>
 
@@ -842,6 +927,158 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* Profile Settings Modal */}
+      {showProfileSettings && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div
+            className={`bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6 ${
+              darkMode ? "border-gray-700" : "border-gray-200"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className={`text-xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>Profile Settings</h3>
+              <Button variant="ghost" onClick={() => setShowProfileSettings(false)}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <form onSubmit={handleProfileSubmit} className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  name="fullName"
+                  value={profileForm.fullName}
+                  onChange={handleProfileChange}
+                  className={`mt-1 block w-full rounded-md border ${
+                    darkMode ? "border-gray-600 bg-gray-700 text-white" : "border-gray-300 bg-white text-gray-900"
+                  } p-2 focus:ring-indigo-500 focus:border-indigo-500`}
+                  placeholder="Enter your full name"
+                />
+                {formErrors.fullName && <p className="text-red-500 text-sm mt-1">{formErrors.fullName}</p>}
+              </div>
+              <div>
+                <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={profileForm.email}
+                  disabled
+                  className={`mt-1 block w-full rounded-md border ${
+                    darkMode ? "border-gray-600 bg-gray-700 text-gray-400" : "border-gray-300 bg-gray-200 text-gray-500"
+                  } p-2 cursor-not-allowed`}
+                />
+                {formErrors.email && <p className="text-red-500 text-sm mt-1">{formErrors.email}</p>}
+              </div>
+              <div>
+                <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Age
+                </label>
+                <input
+                  type="number"
+                  name="age"
+                  value={profileForm.age}
+                  onChange={handleProfileChange}
+                  className={`mt-1 block w-full rounded-md border ${
+                    darkMode ? "border-gray-600 bg-gray-700 text-white" : "border-gray-300 bg-white text-gray-900"
+                  } p-2 focus:ring-indigo-500 focus:border-indigo-500`}
+                  placeholder="Enter your age"
+                />
+                {formErrors.age && <p className="text-red-500 text-sm mt-1">{formErrors.age}</p>}
+              </div>
+              <div>
+                <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Phone Number (Optional)
+                </label>
+                <input
+                  type="text"
+                  name="phone"
+                  value={profileForm.phone}
+                  onChange={handleProfileChange}
+                  className={`mt-1 block w-full rounded-md border ${
+                    darkMode ? "border-gray-600 bg-gray-700 text-white" : "border-gray-300 bg-white text-gray-900"
+                  } p-2 focus:ring-indigo-500 focus:border-indigo-500`}
+                  placeholder="Enter your phone number"
+                />
+                {formErrors.phone && <p className="text-red-500 text-sm mt-1">{formErrors.phone}</p>}
+              </div>
+              <div>
+                <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Current Password
+                </label>
+                <input
+                  type="password"
+                  name="currentPassword"
+                  value={profileForm.currentPassword}
+                  onChange={handleProfileChange}
+                  className={`mt-1 block w-full rounded-md border ${
+                    darkMode ? "border-gray-600 bg-gray-700 text-white" : "border-gray-300 bg-white text-gray-900"
+                  } p-2 focus:ring-indigo-500 focus:border-indigo-500`}
+                  placeholder="Enter current password"
+                />
+                {formErrors.currentPassword && (
+                  <p className="text-red-500 text-sm mt-1">{formErrors.currentPassword}</p>
+                )}
+              </div>
+              <div>
+                <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  name="newPassword"
+                  value={profileForm.newPassword}
+                  onChange={handleProfileChange}
+                  className={`mt-1 block w-full rounded-md border ${
+                    darkMode ? "border-gray-600 bg-gray-700 text-white" : "border-gray-300 bg-white text-gray-900"
+                  } p-2 focus:ring-indigo-500 focus:border-indigo-500`}
+                  placeholder="Enter new password"
+                />
+                {formErrors.newPassword && <p className="text-red-500 text-sm mt-1">{formErrors.newPassword}</p>}
+              </div>
+              <div>
+                <label className={`block text-sm font-medium ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={profileForm.confirmPassword}
+                  onChange={handleProfileChange}
+                  className={`mt-1 block w-full rounded-md border ${
+                    darkMode ? "border-gray-600 bg-gray-700 text-white" : "border-gray-300 bg-white text-gray-900"
+                  } p-2 focus:ring-indigo-500 focus:border-indigo-500`}
+                  placeholder="Confirm new password"
+                />
+                {formErrors.confirmPassword && (
+                  <p className="text-red-500 text-sm mt-1">{formErrors.confirmPassword}</p>
+                )}
+              </div>
+              <div className="flex justify-end space-x-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowProfileSettings(false)}
+                  className={`${darkMode ? "border-gray-600 text-gray-300" : "border-gray-300 text-gray-700"}`}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-gradient-to-r from-indigo-600 to-teal-600 hover:from-indigo-700 hover:to-teal-700"
+                >
+                  {isSubmitting ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
-  )
+  );
 }
