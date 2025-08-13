@@ -1,9 +1,10 @@
-"use client"
-import Link from "next/link"
-import { useDarkMode } from "@/contexts/dark-mode-context"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+"use client";
+import Link from "next/link";
+import { useDarkMode } from "@/contexts/dark-mode-context";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useAppointmentStatus } from "app/reception/hooks/useAppointmentStatus";
 import {
   Sun,
   Moon,
@@ -19,11 +20,12 @@ import {
   GraduationCap,
   Building,
   CheckCircle,
-} from "lucide-react"
-import { useTheme } from "next-themes"
+} from "lucide-react";
+import { useTheme } from "next-themes";
 
 export default function DoctorProfile() {
-  const { darkMode, toggleDarkMode } = useDarkMode()
+  const { darkMode, toggleDarkMode } = useDarkMode();
+  const { active, loading: statusLoading } = useAppointmentStatus();
 
   const doctor = {
     name: "Dr. Nitin Mishra",
@@ -74,7 +76,7 @@ export default function DoctorProfile() {
       },
     ],
     timeSlots: [],
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-slate-50 to-teal-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-700">
@@ -93,7 +95,9 @@ export default function DoctorProfile() {
                 <div className="w-8 h-8 bg-gradient-to-r from-indigo-600 to-teal-600 rounded-lg flex items-center justify-center">
                   <Stethoscope className="h-4 w-4 text-white" />
                 </div>
-                <span className="text-lg font-bold text-gray-900 dark:text-gray-100">Dr. Nitin Mishra</span>
+                <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                  Dr. Nitin Mishra
+                </span>
               </div>
             </div>
 
@@ -103,7 +107,9 @@ export default function DoctorProfile() {
                 size="icon"
                 onClick={toggleDarkMode}
                 className="hover:bg-gray-100 dark:hover:bg-gray-700"
-                aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+                aria-label={
+                  darkMode ? "Switch to light mode" : "Switch to dark mode"
+                }
               >
                 {darkMode ? (
                   <Sun className="h-5 w-5" />
@@ -111,10 +117,6 @@ export default function DoctorProfile() {
                   <Moon className="h-5 w-5" />
                 )}
               </Button>
-
-              <Link href="/login">
-                <Button variant="outline">Login</Button>
-              </Link>
             </div>
           </div>
         </div>
@@ -130,34 +132,44 @@ export default function DoctorProfile() {
                 <div className="flex flex-col md:flex-row gap-8">
                   <div className="relative">
                     <img
-                      src={doctor.image || "/placeholder.svg?height=256&width=256"}
+                      src={
+                        doctor.image || "/placeholder.svg?height=256&width=256"
+                      }
                       alt={doctor.name}
                       className="w-64 h-64 rounded-2xl object-cover mx-auto md:mx-0 shadow-lg"
                       onError={(e) => {
-                        e.currentTarget.src = "/placeholder.svg?height=256&width=256"; // Fallback image
+                        e.currentTarget.src =
+                          "/placeholder.svg?height=256&width=256"; // Fallback image
                       }}
                     />
-                    <div className="absolute -bottom-4 -right-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                      Available Today
-                    </div>
                   </div>
 
                   <div className="flex-1">
                     <div className="mb-4">
-                      <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">{doctor.name}</h1>
-                      <p className="text-2xl text-teal-500 font-semibold mb-2">{doctor.specialization}</p>
-                      <p className="text-lg text-gray-600 dark:text-gray-400 font-medium">{doctor.qualifications}</p>
+                      <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                        {doctor.name}
+                      </h1>
+                      <p className="text-2xl text-teal-500 font-semibold mb-2">
+                        {doctor.specialization}
+                      </p>
+                      <p className="text-lg text-gray-600 dark:text-gray-400 font-medium">
+                        {doctor.qualifications}
+                      </p>
                     </div>
 
                     <div className="flex flex-wrap gap-6 mb-6">
                       <div className="flex items-center space-x-2">
                         <Award className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                        <span className="text-gray-700 dark:text-gray-300">{doctor.experience} Experience</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {doctor.experience} Experience
+                        </span>
                       </div>
 
                       <div className="flex items-center space-x-2">
                         <Users className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                        <span className="text-gray-700 dark:text-gray-300">5000+ Patients Treated</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          5000+ Patients Treated
+                        </span>
                       </div>
                     </div>
 
@@ -177,7 +189,9 @@ export default function DoctorProfile() {
                       <div className="text-3xl font-bold text-green-600 dark:text-green-400 mb-1">
                         ₹{doctor.consultationFee}
                       </div>
-                      <div className="text-gray-600 dark:text-gray-400">Consultation Fee</div>
+                      <div className="text-gray-600 dark:text-gray-400">
+                        Consultation Fee
+                      </div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3">
@@ -214,7 +228,9 @@ export default function DoctorProfile() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-700 dark:text-gray-300 leading-relaxed text-lg">{doctor.about}</p>
+                <p className="text-gray-700 dark:text-gray-300 leading-relaxed text-lg">
+                  {doctor.about}
+                </p>
               </CardContent>
             </Card>
 
@@ -231,7 +247,9 @@ export default function DoctorProfile() {
                   {doctor.education.map((edu, index) => (
                     <div key={index} className="flex items-start space-x-3">
                       <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-                      <span className="text-gray-700 dark:text-gray-300 text-lg">{edu}</span>
+                      <span className="text-gray-700 dark:text-gray-300 text-lg">
+                        {edu}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -254,7 +272,9 @@ export default function DoctorProfile() {
                       className="flex items-center space-x-3 p-3 bg-indigo-50 dark:bg-indigo-900 rounded-lg"
                     >
                       <div className="w-2 h-2 bg-indigo-600 rounded-full"></div>
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">{specialty}</span>
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">
+                        {specialty}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -276,18 +296,29 @@ export default function DoctorProfile() {
                       key={index}
                       className="p-4 bg-gradient-to-r from-indigo-50 to-teal-50 dark:from-indigo-900 dark:to-teal-900 rounded-lg"
                     >
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">{clinic.name}</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                        {clinic.name}
+                      </h3>
                       <div className="flex items-center space-x-2 mb-3">
                         <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                        <span className="text-gray-700 dark:text-gray-300">{clinic.address}</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {clinic.address}
+                        </span>
                       </div>
                       <div className="space-y-1">
-                        {Object.entries(clinic.timings).map(([period, timing]) => (
-                          <div key={period} className="flex items-center space-x-2">
-                            <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                            <span className="text-gray-700 dark:text-gray-300 capitalize">{timing}</span>
-                          </div>
-                        ))}
+                        {Object.entries(clinic.timings).map(
+                          ([period, timing]) => (
+                            <div
+                              key={period}
+                              className="flex items-center space-x-2"
+                            >
+                              <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                              <span className="text-gray-700 dark:text-gray-300 capitalize">
+                                {timing}
+                              </span>
+                            </div>
+                          )
+                        )}
                       </div>
                     </div>
                   ))}
@@ -310,15 +341,23 @@ export default function DoctorProfile() {
                 <div className="flex items-center space-x-3 p-3 bg-green-50 dark:bg-green-900 rounded-lg">
                   <Phone className="h-5 w-5 text-green-600 dark:text-green-400" />
                   <div>
-                    <div className="font-medium text-gray-900 dark:text-gray-100">Call Now</div>
-                    <div className="text-green-600 dark:text-green-400 font-bold">9258924611</div>
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
+                      Call Now
+                    </div>
+                    <div className="text-green-600 dark:text-green-400 font-bold">
+                      9258924611
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3 p-3 bg-indigo-50 dark:bg-indigo-900 rounded-lg">
                   <Mail className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   <div>
-                    <div className="font-medium text-gray-900 dark:text-gray-100">Email</div>
-                    <div className="text-indigo-600 dark:text-indigo-400">dermanitin@gmail.com</div>
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
+                      Email
+                    </div>
+                    <div className="text-indigo-600 dark:text-indigo-400">
+                      drnitinmishraderma@gmail.com
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -333,65 +372,121 @@ export default function DoctorProfile() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-900 dark:text-gray-100">10:00 AM - 2:00 PM</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Rampur Garden Clinic</div>
+                {statusLoading ? (
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-4">
+                    Checking appointment availability...
+                  </p>
+                ) : active ? (
+                  <>
+                    <div className="space-y-3">
+                      {/* Slot 1 */}
+                      <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900 rounded-lg">
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-gray-100">
+                            10:00 AM - 2:00 PM
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Rampur Garden Clinic
+                          </div>
+                        </div>
+                        <Badge className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+                          Available
+                        </Badge>
+                      </div>
+                      {/* Slot 2 */}
+                      <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900 rounded-lg">
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-gray-100">
+                            6:00 PM - 8:00 PM
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            Rampur Garden Clinic
+                          </div>
+                        </div>
+                        <Badge className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+                          Available
+                        </Badge>
+                      </div>
+                      {/* Slot 3 */}
+                      <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900 rounded-lg">
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-gray-100">
+                            2:00 PM - 4:00 PM
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            DD Puram Clinic
+                          </div>
+                        </div>
+                        <Badge className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+                          Available
+                        </Badge>
+                      </div>
+                      {/* Slot 4 */}
+                      <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900 rounded-lg">
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-gray-100">
+                            8:30 PM - 9:30 PM
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            DD Puram Clinic
+                          </div>
+                        </div>
+                        <Badge className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
+                          Available
+                        </Badge>
+                      </div>
                     </div>
-                    <Badge className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-                      Available
-                    </Badge>
+                    <Link href="/appointment">
+                      <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700">
+                        Book Appointment
+                      </Button>
+                    </Link>
+                  </>
+                ) : (
+                  <div className="text-center py-6">
+                    <p className="text-red-600 dark:text-red-400 font-semibold mb-2">
+                      Appointments Closed
+                    </p>
+                    <p className="text-gray-700 dark:text-gray-300 mb-4">
+                      Please come back tomorrow at 10 AM.
+                    </p>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-900 dark:text-gray-100">6:00 PM - 8:00 PM</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Rampur Garden Clinic</div>
-                    </div>
-                    <Badge className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-                      Available
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-900 dark:text-gray-100">2:00 PM - 4:00 PM</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">DD Puram Clinic</div>
-                    </div>
-                    <Badge className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-                      Available
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-900 dark:text-gray-100">8:30 PM - 9:30 PM</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">DD Puram Clinic</div>
-                    </div>
-                    <Badge className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-                      Available
-                    </Badge>
-                  </div>
-                </div>
-                <Link href="/appointment">
-                  <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700">Book Appointment</Button>
-                </Link>
+                )}
               </CardContent>
             </Card>
 
             {/* Booking Options */}
             <Card className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm border-0 shadow-xl">
               <CardHeader>
-                <CardTitle className="text-gray-900 dark:text-gray-100">Booking Options</CardTitle>
+                <CardTitle className="text-gray-900 dark:text-gray-100">
+                  Booking Options
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button className="w-full bg-gradient-to-r from-indigo-600 to-teal-600" asChild>
+                <Button
+                  className="w-full bg-gradient-to-r from-indigo-600 to-teal-600"
+                  asChild
+                >
                   <Link href="/appointment">Book via Website</Link>
                 </Button>
-                <Button variant="outline" className="w-full bg-white/50 dark:bg-gray-700/50" asChild>
-                  <a href="https://www.practo.com" target="_blank" rel="noopener noreferrer">
+                <Button
+                  variant="outline"
+                  className="w-full bg-white/50 dark:bg-gray-700/50"
+                  asChild
+                >
+                  <a
+                    href="https://www.practo.com/bareilly/doctor/nitin-mishra-dermatologist"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     Book via Practo
                   </a>
                 </Button>
-                <Button variant="outline" className="w-full bg-white/50 dark:bg-gray-700/50" asChild>
+                <Button
+                  variant="outline"
+                  className="w-full bg-white/50 dark:bg-gray-700/50"
+                  asChild
+                >
                   <a href="tel:9258924611">Call to Book</a>
                 </Button>
               </CardContent>
@@ -400,5 +495,5 @@ export default function DoctorProfile() {
         </div>
       </div>
     </div>
-  )
+  );
 }
