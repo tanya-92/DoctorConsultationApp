@@ -5,6 +5,8 @@ import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
 import { DarkModeProvider } from "@/contexts/dark-mode-context"
 import RegisterSW from "@/components/RegisterSW"
+import type { ReactNode } from "react";
+import RoleWatcher from "@/components/roleWatcher";
 
 export const metadata: Metadata = {
   title: "Dr. Nitin Mishra - Skin Specialist",
@@ -37,6 +39,7 @@ export default function RootLayout({
         <link rel="icon" href="/icons/icon-192x192.png" />
       </head>
       <body>
+        <RoleWatcher />
         <AuthProvider>
           <DarkModeProvider>
             <ThemeProvider

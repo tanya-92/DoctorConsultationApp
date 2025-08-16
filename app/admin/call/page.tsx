@@ -1,229 +1,326 @@
-"use client"
+"use client";
 
-import { useEffect, useRef, useState } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { useAuthState } from "react-firebase-hooks/auth"
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Users, Clock, ArrowLeft, Loader2 } from "lucide-react"
-import { auth, db } from "@/lib/firebase"
-import { doc, updateDoc, addDoc, getDocs, where, query, collection, deleteDoc, serverTimestamp, onSnapshot } from "firebase/firestore"
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useAuthState } from "react-firebase-hooks/auth";
+import {
+  Phone,
+  PhoneOff,
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  Users,
+  Clock,
+  ArrowLeft,
+  Loader2,
+} from "lucide-react";
+import { auth, db } from "@/lib/firebase";
+import {
+  doc,
+  updateDoc,
+  addDoc,
+  getDocs,
+  where,
+  query,
+  collection,
+  deleteDoc,
+  serverTimestamp,
+  onSnapshot,
+} from "firebase/firestore";
 
-const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID!
-const tokenBaseURL = process.env.NEXT_PUBLIC_TOKEN_BASE_URL!
+const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
+const tokenBaseURL = process.env.NEXT_PUBLIC_TOKEN_BASE_URL!;
 
 const AdminCallPage = () => {
-  const [user] = useAuthState(auth)
-  const searchParams = useSearchParams()
-  const channelName = searchParams.get("channel")
-  const callType = searchParams.get("type") || "video"
-  const callId = searchParams.get("callId")
-  const router = useRouter()
+  const unsubscribeRef = useRef<any>(null);
+  const [user] = useAuthState(auth);
+  const searchParams = useSearchParams();
+  const channelName = searchParams.get("channel");
+  const callType = searchParams.get("type") || "video";
+  const callId = searchParams.get("callId");
+  const router = useRouter();
 
-  const localVideoRef = useRef<HTMLDivElement>(null)
-  const remoteVideoRef = useRef<HTMLDivElement>(null)
-  const clientRef = useRef<any>(null)
-  const localTracksRef = useRef<any>(null)
-  const callStartTimeRef = useRef<Date | null>(null)
+  const localVideoRef = useRef<HTMLDivElement>(null);
+  const remoteVideoRef = useRef<HTMLDivElement>(null);
+  const clientRef = useRef<any>(null);
+  const localTracksRef = useRef<any>(null);
+  const callStartTimeRef = useRef<Date | null>(null);
 
-  const [AgoraRTC, setAgoraRTC] = useState<any>(null)
-  const [joined, setJoined] = useState(false)
-  const [connecting, setConnecting] = useState(false)
-  const [remoteUsers, setRemoteUsers] = useState<any[]>([])
-  const [mutedAudio, setMutedAudio] = useState(false)
-  const [mutedVideo, setMutedVideo] = useState(false)
-  const [callDuration, setCallDuration] = useState(0)
-  const [connectionStatus, setConnectionStatus] = useState("Ready to connect")
-  const [callData, setCallData] = useState<any>(null)
+  const [AgoraRTC, setAgoraRTC] = useState<any>(null);
+  const [joined, setJoined] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [remoteUsers, setRemoteUsers] = useState<any[]>([]);
+  const [mutedAudio, setMutedAudio] = useState(false);
+  const [mutedVideo, setMutedVideo] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
+  const [connectionStatus, setConnectionStatus] = useState("Ready to connect");
+  const [callData, setCallData] = useState<any>(null);
 
-  // Listen to call data changes
+  // 🔔 Listen to call doc updates
   useEffect(() => {
-    if (!callId) return
+    if (!callId) return;
 
-    const unsubscribe = onSnapshot(doc(db, "activeCalls", callId), (doc) => {
-      if (doc.exists()) {
-        setCallData(doc.data())
+    const unsubscribe = onSnapshot(doc(db, "activeCalls", callId), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setCallData(data);
+
+        if (data.status === "ended") {
+          console.log("Call ended by other side, leaving...");
+          leaveCall();
+        }
+
+        if (data.status === "declined") {
+          console.log("Doctor declined the call");
+          leaveCall();
+        }
       }
-    })
+    });
 
-    return () => unsubscribe()
-  }, [callId])
+    unsubscribeRef.current = unsubscribe;
+    return () => unsubscribe();
+  }, [callId]);
+
+  useEffect(() => {
+    if (!callId) return;
+
+    const callDocRef = doc(db, "activeCalls", callId);
+    const unsubscribe = onSnapshot(callDocRef, (snap) => {
+      if (!snap.exists() || snap.data()?.status === "ended") {
+        leaveCall(); // ✅ auto leave jab dusra banda end kare
+      }
+    });
+
+    return () => unsubscribe();
+  }, [callId]);
+
+  // 🔴 Auto cleanup on page unload (refresh/close tab)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      leaveCall();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      handleBeforeUnload();
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
 
   // Load AgoraRTC dynamically
   useEffect(() => {
-    ; (async () => {
+    (async () => {
       try {
-        const rtc = await import("agora-rtc-sdk-ng")
-        setAgoraRTC(rtc)
-        setConnectionStatus("Ready to connect")
+        const rtc = await import("agora-rtc-sdk-ng");
+        setAgoraRTC(rtc);
+        setConnectionStatus("Ready to connect");
       } catch (error) {
-        console.error("Failed to load Agora SDK:", error)
-        setConnectionStatus("Failed to load video SDK")
+        console.error("Failed to load Agora SDK:", error);
+        setConnectionStatus("Failed to load video SDK");
       }
-    })()
-  }, [])
+    })();
+  }, []);
 
   // Call duration timer
   useEffect(() => {
-    let interval: NodeJS.Timeout
+    let interval: NodeJS.Timeout;
     if (joined && callStartTimeRef.current) {
       interval = setInterval(() => {
-        const now = new Date()
-        const duration = Math.floor((now.getTime() - callStartTimeRef.current!.getTime()) / 1000)
-        setCallDuration(duration)
-      }, 1000)
+        const now = new Date();
+        const duration = Math.floor(
+          (now.getTime() - callStartTimeRef.current!.getTime()) / 1000
+        );
+        setCallDuration(duration);
+      }, 1000);
     }
-    return () => clearInterval(interval)
-  }, [joined])
+    return () => clearInterval(interval);
+  }, [joined]);
 
   const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
-  }
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  };
 
   const joinCall = async () => {
-    if (!channelName || !user || !AgoraRTC) return
+    if (!channelName || !user || !AgoraRTC) return;
 
-    setConnecting(true)
-    setConnectionStatus("Joining call...")
+    setConnecting(true);
+    setConnectionStatus("Joining call...");
 
     try {
-      const uid = `doctor_${user.uid}`
-      let token = null
+      const uid = `doctor_${user.uid}`;
+      let token = null;
 
       // Try to fetch token
       try {
         if (tokenBaseURL) {
-          const res = await fetch(`${tokenBaseURL}?channelName=${channelName}&uid=${uid}&role=doctor`)
+          const res = await fetch(
+            `${tokenBaseURL}?channelName=${channelName}&uid=${uid}&role=doctor`
+          );
           if (res.ok) {
-            const data = await res.json()
-            token = data?.token || null
+            const data = await res.json();
+            token = data?.token || null;
           }
         }
       } catch (tokenError) {
-        console.warn("Token generation failed, using null token for testing")
+        console.warn("Token generation failed, using null token for testing");
       }
 
-      const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" })
-      clientRef.current = client
+      const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+      clientRef.current = client;
 
       client.on("user-published", async (remoteUser: any, mediaType: any) => {
-        await client.subscribe(remoteUser, mediaType)
+        await client.subscribe(remoteUser, mediaType);
         if (mediaType === "video" && callType === "video") {
-          remoteVideoRef.current && remoteUser.videoTrack?.play(remoteVideoRef.current)
+          remoteVideoRef.current &&
+            remoteUser.videoTrack?.play(remoteVideoRef.current);
         }
         if (mediaType === "audio") {
-          remoteUser.audioTrack?.play()
+          remoteUser.audioTrack?.play();
         }
         setRemoteUsers((prev) => {
-          const existing = prev.find((u) => u.uid === remoteUser.uid)
-          if (existing) return prev
-          return [...prev, remoteUser]
-        })
-        setConnectionStatus("Connected")
-      })
+          const existing = prev.find((u) => u.uid === remoteUser.uid);
+          if (existing) return prev;
+          return [...prev, remoteUser];
+        });
+        setConnectionStatus("Connected");
+      });
 
       client.on("user-unpublished", (remoteUser: any) => {
-        setRemoteUsers((prev) => prev.filter((u) => u.uid !== remoteUser.uid))
-      })
+        setRemoteUsers((prev) => prev.filter((u) => u.uid !== remoteUser.uid));
+      });
 
-      await client.join(appId, channelName, token, uid)
+      await client.join(appId, channelName, token, uid);
 
       // Create tracks based on call type
       if (callType === "video") {
-        const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks()
-        localTracksRef.current = [audioTrack, videoTrack]
-        videoTrack.play(localVideoRef.current!)
-        await client.publish([audioTrack, videoTrack])
+        const [audioTrack, videoTrack] =
+          await AgoraRTC.createMicrophoneAndCameraTracks();
+        localTracksRef.current = [audioTrack, videoTrack];
+        videoTrack.play(localVideoRef.current!);
+        await client.publish([audioTrack, videoTrack]);
       } else {
-        const audioTrack = await AgoraRTC.createMicrophoneAudioTrack()
-        localTracksRef.current = [audioTrack]
-        await client.publish([audioTrack])
+        const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+        localTracksRef.current = [audioTrack];
+        await client.publish([audioTrack]);
       }
 
-      setJoined(true)
-      callStartTimeRef.current = new Date()
-      setConnectionStatus("Connected")
+      setJoined(true);
+      callStartTimeRef.current = new Date();
+      setConnectionStatus("Connected");
 
       // Update call status in Firebase
       if (callId) {
         await updateDoc(doc(db, "activeCalls", callId), {
           status: "connected",
           doctorJoinedAt: serverTimestamp(),
-        })
+        });
       }
     } catch (error) {
-      console.error("Failed to join call:", error)
-      setConnectionStatus("Connection failed")
-      alert("Failed to join call. Please try again.")
+      console.error("Failed to join call:", error);
+      setConnectionStatus("Connection failed");
+      alert("Failed to join call. Please try again.");
     } finally {
-      setConnecting(false)
+      setConnecting(false);
     }
-  }
+  };
 
   const toggleAudio = () => {
-    const audioTrack = localTracksRef.current?.[0]
+    const audioTrack = localTracksRef.current?.[0];
     if (audioTrack) {
-      audioTrack.setEnabled(mutedAudio)
-      setMutedAudio(!mutedAudio)
+      audioTrack.setEnabled(mutedAudio);
+      setMutedAudio(!mutedAudio);
     }
-  }
+  };
 
   const toggleVideo = () => {
-    if (callType === "audio") return
+    if (callType === "audio") return;
 
-    const videoTrack = localTracksRef.current?.[1]
+    const videoTrack = localTracksRef.current?.[1];
     if (videoTrack) {
-      videoTrack.setEnabled(mutedVideo)
-      setMutedVideo(!mutedVideo)
+      videoTrack.setEnabled(mutedVideo);
+      setMutedVideo(!mutedVideo);
     }
-  }
+  };
+
   const leaveCall = async () => {
     if (clientRef.current && localTracksRef.current) {
       localTracksRef.current.forEach((track: any) => track.close());
       await clientRef.current.leave();
 
       const duration = callStartTimeRef.current
-        ? Math.floor((new Date().getTime() - callStartTimeRef.current.getTime()) / 1000)
+        ? Math.floor(
+            (new Date().getTime() - callStartTimeRef.current.getTime()) / 1000
+          )
         : 0;
 
-      if (callId && callData) {
+      if (callId) {
         try {
           const logsRef = collection(db, "callLogs");
           const existingLogs = await getDocs(
-            query(logsRef, where("callId", "==", callData.id))
+            query(logsRef, where("callId", "==", callId))
           );
 
           if (existingLogs.empty) {
             await addDoc(logsRef, {
-              callId: callData.id,
-              patientName: callData.patientName,
-              patientUid: callData.patientUid,
-              callType: callData.callType,
+              callId,
+              patientUid: user?.uid || null,
+              patientName: user?.displayName || "Patient",
+              patientEmail: user?.email || "patient@example.com",
+              callType,
               duration,
-              startTime: callData.createdAt,
+              startTime: callStartTimeRef.current
+                ? new Date(callStartTimeRef.current)
+                : new Date(),
               endTime: serverTimestamp(),
-              status: "cancelled",
+              status: "completed",
             });
           }
+
+          // ✅ Mark call ended (safe with try/catch)
+          try {
+            await updateDoc(doc(db, "activeCalls", callId), {
+              status: "ended",
+              endedAt: serverTimestamp(),
+            });
+          } catch (err) {
+            console.warn("Call doc already removed by other side");
+          }
+
+          // ✅ Optional: cleanup after 5s
+          setTimeout(async () => {
+            try {
+              await deleteDoc(doc(db, "activeCalls", callId));
+            } catch {
+              /* ignore if already deleted */
+            }
+          }, 5000);
         } catch (error) {
-          console.error("Error logging call:", error);
+          console.error("Error updating call logs:", error);
         }
-
-        setJoined(false);
-        setCallDuration(0);
-        setConnectionStatus("Call ended");
-
-        setTimeout(() => {
-          router.push(`/admin/chat?patientEmail=${callData?.patientEmail || ''}`);
-        }, 1000);
+        if (unsubscribeRef.current) {
+          unsubscribeRef.current();
+          unsubscribeRef.current = null;
+        }
       }
+
+      setJoined(false);
+      setCallDuration(0);
+      setConnectionStatus("Call ended");
+
+      setTimeout(() => {
+        router.push("/admin/calls");
+      }, 1000);
     }
   };
-
-
 
   if (!user || !AgoraRTC) {
     return (
@@ -233,7 +330,7 @@ const AdminCallPage = () => {
           <p className="text-lg">Loading call interface...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -245,7 +342,11 @@ const AdminCallPage = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push("/admin/chat?patientEmail=${callData?.patientEmail || ''}")}
+              onClick={() =>
+                router.push(
+                  "/admin/chat?patientEmail=${callData?.patientEmail || ''}"
+                )
+              }
               className="text-white hover:bg-white/10"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -261,7 +362,8 @@ const AdminCallPage = () => {
               </div>
               <div>
                 <h2 className="font-semibold">
-                  {callType === "video" ? "Video Call" : "Audio Call"} with {callData?.patientName || "Patient"}
+                  {callType === "video" ? "Video Call" : "Audio Call"} with{" "}
+                  {callData?.patientName || "Patient"}
                 </h2>
                 <p className="text-sm text-gray-300">Doctor Session</p>
               </div>
@@ -270,21 +372,27 @@ const AdminCallPage = () => {
           <div className="flex items-center space-x-4">
             <Badge
               variant="secondary"
-              className={`${connectionStatus === "Connected"
-                ? "bg-green-500/20 text-green-300 border-green-500/30"
-                : "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
-                }`}
+              className={`${
+                connectionStatus === "Connected"
+                  ? "bg-green-500/20 text-green-300 border-green-500/30"
+                  : "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
+              }`}
             >
               <div
-                className={`w-2 h-2 rounded-full mr-2 ${connectionStatus === "Connected" ? "bg-green-400 animate-pulse" : "bg-yellow-400"
-                  }`}
+                className={`w-2 h-2 rounded-full mr-2 ${
+                  connectionStatus === "Connected"
+                    ? "bg-green-400 animate-pulse"
+                    : "bg-yellow-400"
+                }`}
               ></div>
               {connectionStatus}
             </Badge>
             {joined && (
               <div className="flex items-center space-x-2 text-sm text-gray-300">
                 <Clock className="h-4 w-4" />
-                <span className="font-mono">{formatDuration(callDuration)}</span>
+                <span className="font-mono">
+                  {formatDuration(callDuration)}
+                </span>
               </div>
             )}
           </div>
@@ -337,7 +445,9 @@ const AdminCallPage = () => {
                     {remoteUsers.length === 0 && (
                       <div className="text-center">
                         <Users className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                        <p className="text-gray-400">Waiting for patient to join...</p>
+                        <p className="text-gray-400">
+                          Waiting for patient to join...
+                        </p>
                       </div>
                     )}
                   </div>
@@ -377,17 +487,31 @@ const AdminCallPage = () => {
                           className="p-3"
                           title={mutedAudio ? "Unmute" : "Mute"}
                         >
-                          {mutedAudio ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                          {mutedAudio ? (
+                            <MicOff className="h-5 w-5" />
+                          ) : (
+                            <Mic className="h-5 w-5" />
+                          )}
                         </Button>
                         <Button
                           variant={mutedVideo ? "destructive" : "secondary"}
                           onClick={toggleVideo}
                           className="p-3"
-                          title={mutedVideo ? "Turn Camera On" : "Turn Camera Off"}
+                          title={
+                            mutedVideo ? "Turn Camera On" : "Turn Camera Off"
+                          }
                         >
-                          {mutedVideo ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+                          {mutedVideo ? (
+                            <VideoOff className="h-5 w-5" />
+                          ) : (
+                            <Video className="h-5 w-5" />
+                          )}
                         </Button>
-                        <Button variant="destructive" onClick={leaveCall} className="px-6 py-3">
+                        <Button
+                          variant="destructive"
+                          onClick={leaveCall}
+                          className="px-6 py-3"
+                        >
                           <PhoneOff className="h-5 w-5 mr-2" />
                           End Call
                         </Button>
@@ -406,7 +530,9 @@ const AdminCallPage = () => {
                 <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Phone className="h-12 w-12 text-white" />
                 </div>
-                <CardTitle className="text-xl">{callData?.patientName || "Patient"} Call</CardTitle>
+                <CardTitle className="text-xl">
+                  {callData?.patientName || "Patient"} Call
+                </CardTitle>
                 <p className="text-gray-400">Audio Call Session</p>
                 {joined && (
                   <div className="flex items-center justify-center space-x-2 text-lg font-mono mt-2">
@@ -418,8 +544,11 @@ const AdminCallPage = () => {
               <CardContent className="text-center space-y-6">
                 <div className="flex items-center justify-center space-x-2 text-sm">
                   <div
-                    className={`w-3 h-3 rounded-full ${connectionStatus === "Connected" ? "bg-green-500 animate-pulse" : "bg-yellow-500"
-                      }`}
+                    className={`w-3 h-3 rounded-full ${
+                      connectionStatus === "Connected"
+                        ? "bg-green-500 animate-pulse"
+                        : "bg-yellow-500"
+                    }`}
                   ></div>
                   <span>{connectionStatus}</span>
                 </div>
@@ -454,9 +583,18 @@ const AdminCallPage = () => {
                         size="lg"
                         title={mutedAudio ? "Unmute" : "Mute"}
                       >
-                        {mutedAudio ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+                        {mutedAudio ? (
+                          <MicOff className="h-6 w-6" />
+                        ) : (
+                          <Mic className="h-6 w-6" />
+                        )}
                       </Button>
-                      <Button variant="destructive" onClick={leaveCall} className="px-6 py-4" size="lg">
+                      <Button
+                        variant="destructive"
+                        onClick={leaveCall}
+                        className="px-6 py-4"
+                        size="lg"
+                      >
                         <PhoneOff className="h-6 w-6 mr-2" />
                         End Call
                       </Button>
@@ -475,7 +613,7 @@ const AdminCallPage = () => {
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default AdminCallPage
+export default AdminCallPage;

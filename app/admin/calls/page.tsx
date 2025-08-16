@@ -143,18 +143,6 @@ export default function CallsPage() {
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Active Calls</h1>
           <p className="text-slate-600 dark:text-slate-400">Manage incoming patient calls</p>
         </div>
-        <Button
-          variant="default"
-          className="flex items-center space-x-2"
-        >
-          <PhoneCall className="h-4 w-4" />
-          <span>Active Calls</span>
-          {activeCalls.length > 0 && (
-            <Badge variant="destructive" className="ml-2">
-              {activeCalls.length}
-            </Badge>
-          )}
-        </Button>
       </div>
 
       {/* Active Calls View */}

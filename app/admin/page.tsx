@@ -65,60 +65,61 @@ export default function DoctorDashboard() {
     process.env.NEXT_PUBLIC_DOCTOR_FEE || "500"
   );
 
-// Helper function to check if a document is the toggle document
-const isToggleDocument = (docData: any) => {
-  const keys = Object.keys(docData).map(k => k.toLowerCase());
+  // Helper function to check if a document is the toggle document
+  const isToggleDocument = (docData: any) => {
+    const keys = Object.keys(docData).map((k) => k.toLowerCase());
 
-  const isToggle =
-    typeof docData.active === "boolean" && // your toggle doc
-    keys.length === 1 &&                   // only has "active"
-    !keys.includes("patientname") &&
-    !keys.includes("patientemail") &&
-    !keys.includes("date");
+    const isToggle =
+      typeof docData.active === "boolean" && // your toggle doc
+      keys.length === 1 && // only has "active"
+      !keys.includes("patientname") &&
+      !keys.includes("patientemail") &&
+      !keys.includes("date");
 
-  if (isToggle) {
-    console.log("Filtered toggle document:", docData);
-  }
-  return isToggle;
-};
+    if (isToggle) {
+      console.log("Filtered toggle document:", docData);
+    }
+    return isToggle;
+  };
 
-// Example initialization for allDocs (empty array to avoid error, actual value set in useEffect)
-const allDocs: Array<{ id: string; data: any }> = [];
+  // Example initialization for allDocs (empty array to avoid error, actual value set in useEffect)
+  const allDocs: Array<{ id: string; data: any }> = [];
 
-const actualAppointments = allDocs.filter(doc => !isToggleDocument(doc.data));
-console.log("Docs after filter:", actualAppointments.length);
-
-
-
+  const actualAppointments = allDocs.filter(
+    (doc) => !isToggleDocument(doc.data)
+  );
+  console.log("Docs after filter:", actualAppointments.length);
 
   // Helper function to parse date from various formats
   const parseAppointmentDate = (dateField: any): Date | null => {
     if (!dateField) return null;
-    
+
     try {
       // Firestore Timestamp
-      if (dateField && typeof dateField.toDate === 'function') {
+      if (dateField && typeof dateField.toDate === "function") {
         return dateField.toDate();
       }
-      
+
       // String date
-      if (typeof dateField === 'string') {
+      if (typeof dateField === "string") {
         return new Date(dateField);
       }
-      
+
       // Already a Date object
       if (dateField instanceof Date) {
         return dateField;
       }
-      
+
       // Firestore Timestamp object format
       if (dateField.seconds && dateField.nanoseconds !== undefined) {
-        return new Date(dateField.seconds * 1000 + dateField.nanoseconds / 1000000);
+        return new Date(
+          dateField.seconds * 1000 + dateField.nanoseconds / 1000000
+        );
       }
-      
+
       return null;
     } catch (error) {
-      console.error('Error parsing date:', error, dateField);
+      console.error("Error parsing date:", error, dateField);
       return null;
     }
   };
@@ -126,9 +127,11 @@ console.log("Docs after filter:", actualAppointments.length);
   // Helper function to check if date is today
   const isToday = (date: Date): boolean => {
     const today = new Date();
-    return date.getDate() === today.getDate() &&
-           date.getMonth() === today.getMonth() &&
-           date.getFullYear() === today.getFullYear();
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    );
   };
 
   useEffect(() => {
@@ -140,63 +143,71 @@ console.log("Docs after filter:", actualAppointments.length);
     const unsubscribe = onSnapshot(
       collection(db, "appointments"),
       (snapshot) => {
-        console.log('📊 Real-time update - Total docs:', snapshot.docs.length);
-        
+        console.log("📊 Real-time update - Total docs:", snapshot.docs.length);
+
         // Get all documents and their data for debugging
         const allDocs = snapshot.docs.map((doc) => ({
           id: doc.id,
-          data: doc.data()
+          data: doc.data(),
         }));
-        
-        console.log('📊 All documents:', allDocs);
-        
+
+        console.log("📊 All documents:", allDocs);
+
         // Log all documents to find the toggle document
-        allDocs.forEach(doc => {
+        allDocs.forEach((doc) => {
           const data = doc.data;
           const isToggle = isToggleDocument(data);
-          if (typeof data.appointmentstatus === 'boolean') {
-            console.log('📊 Document with appointmentstatus boolean:', {
+          if (typeof data.appointmentstatus === "boolean") {
+            console.log("📊 Document with appointmentstatus boolean:", {
               id: doc.id,
               appointmentstatus: data.appointmentstatus,
               hasPatientName: !!data.patientName,
               hasPatientEmail: !!data.patientEmail,
               hasDate: !!data.date,
               isToggle: isToggle,
-              allFields: Object.keys(data)
+              allFields: Object.keys(data),
             });
           }
         });
-        
+
         // Filter out toggle documents
-        const actualAppointments = allDocs.filter(doc => !isToggleDocument(doc.data));
-        console.log('📊 After filtering toggle docs:', actualAppointments.length);
-        
+        const actualAppointments = allDocs.filter(
+          (doc) => !isToggleDocument(doc.data)
+        );
+        console.log(
+          "📊 After filtering toggle docs:",
+          actualAppointments.length
+        );
+
         // Get today's appointments
         const todayAppointments = actualAppointments.filter((doc) => {
           const appointmentDate = parseAppointmentDate(doc.data.date);
           if (!appointmentDate) {
-            console.log('📊 Could not parse date for doc:', doc.id, doc.data.date);
+            console.log(
+              "📊 Could not parse date for doc:",
+              doc.id,
+              doc.data.date
+            );
             return false;
           }
-          
+
           const isTodayAppt = isToday(appointmentDate);
           if (isTodayAppt) {
-            console.log('📊 Today appointment found:', doc.id, appointmentDate);
+            console.log("📊 Today appointment found:", doc.id, appointmentDate);
           }
           return isTodayAppt;
         });
 
-        console.log('📊 Today appointments found:', todayAppointments.length);
+        console.log("📊 Today appointments found:", todayAppointments.length);
 
         const totalAppointments = actualAppointments.length;
         const todayCount = todayAppointments.length;
 
-        const totalRevenue = actualAppointments.filter((doc) => 
-          doc.data.status === "completed"
-        ).length * doctorFee;
+        const totalRevenue =
+          actualAppointments.filter((doc) => doc.data.status === "completed")
+            .length * doctorFee;
 
         // Update debug info
-      
 
         setStats((prev) => ({
           ...prev,
@@ -213,50 +224,55 @@ console.log("Docs after filter:", actualAppointments.length);
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      console.log('📊 Fetching dashboard data...');
+      console.log("📊 Fetching dashboard data...");
 
       // Get all appointments
       const appointmentsQuery = query(collection(db, "appointments"));
       const appointmentsSnapshot = await getDocs(appointmentsQuery);
-      
-      console.log('📊 Total docs in collection:', appointmentsSnapshot.size);
-      
+
+      console.log("📊 Total docs in collection:", appointmentsSnapshot.size);
+
       // Filter out toggle documents
       const actualAppointmentDocs = appointmentsSnapshot.docs.filter((doc) => {
         const data = doc.data();
         const isToggle = isToggleDocument(data);
         if (isToggle) {
-          console.log('📊 Toggle document found:', doc.id, data);
+          console.log("📊 Toggle document found:", doc.id, data);
         }
         return !isToggle;
       });
-      
-      const totalAppointments = actualAppointmentDocs.length;
-      console.log('📊 Actual appointments after filtering:', totalAppointments);
 
-      // Get today's appointments 
+      const totalAppointments = actualAppointmentDocs.length;
+      console.log("📊 Actual appointments after filtering:", totalAppointments);
+
+      // Get today's appointments
       const todayAppointments = actualAppointmentDocs.filter((doc) => {
         const data = doc.data();
         const appointmentDate = parseAppointmentDate(data.date);
-        
+
         if (!appointmentDate) {
-          console.log('📊 Could not parse date for doc:', doc.id, data.date);
+          console.log("📊 Could not parse date for doc:", doc.id, data.date);
           return false;
         }
-        
+
         const isTodayAppt = isToday(appointmentDate);
         if (isTodayAppt) {
-          console.log('📊 Today appointment found:', doc.id, appointmentDate, data);
+          console.log(
+            "📊 Today appointment found:",
+            doc.id,
+            appointmentDate,
+            data
+          );
         }
         return isTodayAppt;
       });
 
       const todayCount = todayAppointments.length;
-      console.log('📊 Today appointments count:', todayCount);
+      console.log("📊 Today appointments count:", todayCount);
 
       // Calculate revenue from completed appointments
-      const completedAppointments = actualAppointmentDocs.filter((doc) => 
-        doc.data().status === "completed"
+      const completedAppointments = actualAppointmentDocs.filter(
+        (doc) => doc.data().status === "completed"
       );
       const totalRevenue = completedAppointments.length * doctorFee;
 
@@ -287,7 +303,7 @@ console.log("Docs after filter:", actualAppointments.length);
         limit(10)
       );
       const recentSnapshot = await getDocs(recentQuery);
-      
+
       const activities: RecentActivity[] = recentSnapshot.docs
         .filter((doc) => !isToggleDocument(doc.data()))
         .slice(0, 5)
@@ -301,9 +317,8 @@ console.log("Docs after filter:", actualAppointments.length);
             status: data.status || "pending",
           };
         });
-      
+
       setRecentActivity(activities);
-      
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
     } finally {
@@ -536,12 +551,17 @@ console.log("Docs after filter:", actualAppointments.length);
 
                     // Step 2: Update the role and set forceLogout flag
                     const userDoc = querySnapshot.docs[0];
-                    await updateDoc(userDoc.ref, { 
+                    await updateDoc(userDoc.ref, {
                       role,
-                      forceLogout: true // Set flag to force logout
+                      forceLogout: true, // Set flag to force logout
                     });
+                    setTimeout(async () => {
+                      await updateDoc(userDoc.ref, { role });
+                    }, 1000); 
 
-                    alert(`Role updated to '${role}' for ${email}. User will be logged out.`);
+                    alert(
+                      `Role updated to '${role}' for ${email}. User will be logged out.`
+                    );
                     form.reset();
                   } catch (err) {
                     console.error(err);

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { usePathname } from "next/navigation";
 import {
   Phone,
   PhoneOff,
@@ -26,6 +27,7 @@ import {
   where,
   onSnapshot,
   addDoc,
+  updateDoc,
   collection,
   deleteDoc,
   serverTimestamp,
@@ -38,13 +40,14 @@ const appId = process.env.NEXT_PUBLIC_AGORA_APP_ID!;
 const tokenBaseURL = process.env.NEXT_PUBLIC_TOKEN_BASE_URL!;
 
 const PatientCallPage = () => {
+  const unsubscribeRef = useRef<any>(null);
   const [user] = useAuthState(auth);
   const searchParams = useSearchParams();
   const channelName = searchParams.get("channel");
   const callType = searchParams.get("type") || "video";
   const callId = searchParams.get("callId");
   const router = useRouter();
-
+  const pathname = usePathname();
   const localVideoRef = useRef<HTMLDivElement>(null);
   const remoteVideoRef = useRef<HTMLDivElement>(null);
   const clientRef = useRef<any>(null);
@@ -64,39 +67,71 @@ const PatientCallPage = () => {
   const [callStatus, setCallStatus] = useState<string>("waiting");
 
   useEffect(() => {
-  const createCallIfNeeded = async () => {
-    if (!user || callId) return;
+    const handleBeforeUnload = () => {
+      leaveCall();
+    };
 
-    const callDocRef = doc(db, "activeCalls", user.uid); // doc ID = patientUid
-    const existing = await getDoc(callDocRef);
+    // ✅ tab close / refresh
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
-    if (existing.exists()) {
-      console.log("Active call already exists:", existing.id);
-      return; // Prevent duplicate
-    }
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [callId]);
 
-    const newChannelName = uuidv4();
+  // ✅ detect route change (patient back / portal pe jaye)
+  useEffect(() => {
+    return () => {
+      leaveCall();
+    };
+  }, [pathname]);
 
-    await setDoc(callDocRef, {
-      patientName: user.displayName || "Patient",
-      patientEmail: user.email || "",
-      patientPhone: "",
-      patientUid: user.uid,
-      callType,
-      status: "waiting",
-      createdAt: serverTimestamp(),
-      channelName: newChannelName,
-      urgency: "NA",
+  useEffect(() => {
+    if (!callId) return;
+
+    const callDocRef = doc(db, "activeCalls", callId);
+    const unsubscribe = onSnapshot(callDocRef, (snap) => {
+      if (!snap.exists() || snap.data()?.status === "ended") {
+        leaveCall(); 
+      }
     });
 
-    router.replace(
-      `/call?page=1&type=${callType}&channel=${newChannelName}&callId=${user.uid}`
-    );
-  };
+    return () => unsubscribe();
+  }, [callId]);
 
-  createCallIfNeeded();
-}, [user, callId]);
+  useEffect(() => {
+    const createCallIfNeeded = async () => {
+      if (!user || callId) return;
 
+      const callDocRef = doc(db, "activeCalls", user.uid); // doc ID = patientUid
+      const existing = await getDoc(callDocRef);
+
+      if (existing.exists()) {
+        console.log("Active call already exists:", existing.id);
+        return; // Prevent duplicate
+      }
+
+      const newChannelName = uuidv4();
+
+      await setDoc(callDocRef, {
+        patientName: user.displayName || "Patient",
+        patientEmail: user.email || "",
+        patientPhone: "",
+        patientUid: user.uid,
+        callType,
+        status: "waiting",
+        createdAt: serverTimestamp(),
+        channelName: newChannelName,
+        urgency: "NA",
+      });
+
+      router.replace(
+        `/call?page=1&type=${callType}&channel=${newChannelName}&callId=${user.uid}`
+      );
+    };
+
+    createCallIfNeeded();
+  }, [user, callId]);
 
   useEffect(() => {
     if (!channelName || !callId) return;
@@ -105,7 +140,7 @@ const PatientCallPage = () => {
 
     const unsubscribe = onSnapshot(callDocRef, (docSnap) => {
       if (!docSnap.exists()) {
-        alert("Doctor has ended the call.");
+        alert("The call has ended.");
         router.push("/");
       }
     });
@@ -113,22 +148,33 @@ const PatientCallPage = () => {
     return () => unsubscribe();
   }, [channelName, callId]);
 
-  // Listen to call status changes
+  // 🔔 Listen to call status changes
   useEffect(() => {
     if (!callId) return;
 
-    const unsubscribe = onSnapshot(doc(db, "activeCalls", callId), (doc) => {
-      if (doc.exists()) {
-        const data = doc.data();
-        setCallStatus(data.status || "waiting");
+    const unsubscribe = onSnapshot(
+      doc(db, "activeCalls", callId),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setCallStatus(data.status || "waiting");
 
-        if (data.status === "connected" && !joined) {
-          // Doctor joined, auto-join the call
-          joinCall();
+          if (data.status === "connected" && !joined) {
+            joinCall();
+          }
+
+          if (data.status === "ended") {
+            console.log("Doctor ended the call, leaving...");
+            leaveCall();
+          }
+        } else {
+          console.log("Call doc deleted, ending...");
+          leaveCall();
         }
       }
-    });
+    );
 
+    unsubscribeRef.current = unsubscribe;
     return () => unsubscribe();
   }, [callId, joined]);
 
@@ -163,6 +209,40 @@ const PatientCallPage = () => {
     }
     return () => clearInterval(interval);
   }, [joined]);
+
+  const createCallIfNeeded = async () => {
+    if (!user || callId) return;
+
+    const callDocRef = doc(db, "activeCalls", user.uid); // doc ID = patientUid
+    const existing = await getDoc(callDocRef);
+
+    if (existing.exists()) {
+      console.log("⚠️ Active call already exists, not creating new one");
+      router.replace(
+        `/call?page=1&type=${callType}&channel=${
+          existing.data().channelName
+        }&callId=${user.uid}`
+      );
+      return;
+    }
+
+    // only create if not exists
+    const newChannelName = uuidv4();
+    await setDoc(callDocRef, {
+      patientName: user.displayName || "Patient",
+      patientEmail: user.email || "",
+      patientUid: user.uid,
+      callType,
+      status: "waiting",
+      createdAt: serverTimestamp(),
+      channelName: newChannelName,
+      urgency: "NA",
+    });
+
+    router.replace(
+      `/call?page=1&type=${callType}&channel=${newChannelName}&callId=${user.uid}`
+    );
+  };
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -242,7 +322,7 @@ const PatientCallPage = () => {
     } catch (error) {
       console.error("Failed to join call:", error);
       setConnectionStatus("Connection failed");
-      alert("Failed to join call. Please try again.");
+      alert("The call has ended.");
     } finally {
       setConnecting(false);
     }
@@ -253,17 +333,14 @@ const PatientCallPage = () => {
       localTracksRef.current.forEach((track: any) => track.close());
       await clientRef.current.leave();
 
-      // Calculate call duration
       const duration = callStartTimeRef.current
         ? Math.floor(
-          (new Date().getTime() - callStartTimeRef.current.getTime()) / 1000
-        )
+            (new Date().getTime() - callStartTimeRef.current.getTime()) / 1000
+          )
         : 0;
 
-      // Move to call logs and remove from active calls
       if (callId) {
         try {
-          // Add to call logs
           const logsRef = collection(db, "callLogs");
           const existingLogs = await getDocs(
             query(logsRef, where("callId", "==", callId))
@@ -272,6 +349,7 @@ const PatientCallPage = () => {
           if (existingLogs.empty) {
             await addDoc(logsRef, {
               callId,
+              patientUid: user?.uid || null,
               patientName: user?.displayName || "Patient",
               patientEmail: user?.email || "patient@example.com",
               callType,
@@ -284,11 +362,30 @@ const PatientCallPage = () => {
             });
           }
 
+          // ✅ Mark call ended (safe with try/catch)
+          try {
+            await updateDoc(doc(db, "activeCalls", callId), {
+              status: "ended",
+              endedAt: serverTimestamp(),
+            });
+          } catch (err) {
+            console.warn("Call doc already removed by other side");
+          }
 
-          // Remove from active calls
-          await deleteDoc(doc(db, "activeCalls", callId));
+          // ✅ Optional: cleanup after 5s
+          setTimeout(async () => {
+            try {
+              await deleteDoc(doc(db, "activeCalls", callId));
+            } catch {
+              /* ignore if already deleted */
+            }
+          }, 5000);
         } catch (error) {
           console.error("Error updating call logs:", error);
+        }
+        if (unsubscribeRef.current) {
+          unsubscribeRef.current();
+          unsubscribeRef.current = null;
         }
       }
 
@@ -296,7 +393,6 @@ const PatientCallPage = () => {
       setCallDuration(0);
       setConnectionStatus("Call ended");
 
-      // Redirect back to chat
       setTimeout(() => {
         router.push("/chat");
       }, 1000);
@@ -369,22 +465,24 @@ const PatientCallPage = () => {
           <div className="flex items-center space-x-4">
             <Badge
               variant="secondary"
-              className={`${connectionStatus === "Connected" ||
-                  connectionStatus === "Connected with doctor"
+              className={`${
+                connectionStatus === "Connected" ||
+                connectionStatus === "Connected with doctor"
                   ? "bg-green-500/20 text-green-300 border-green-500/30"
                   : callStatus === "waiting"
-                    ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
-                    : "bg-red-500/20 text-red-300 border-red-500/30"
-                }`}
+                  ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
+                  : "bg-red-500/20 text-red-300 border-red-500/30"
+              }`}
             >
               <div
-                className={`w-2 h-2 rounded-full mr-2 ${connectionStatus === "Connected" ||
-                    connectionStatus === "Connected with doctor"
+                className={`w-2 h-2 rounded-full mr-2 ${
+                  connectionStatus === "Connected" ||
+                  connectionStatus === "Connected with doctor"
                     ? "bg-green-400 animate-pulse"
                     : callStatus === "waiting"
-                      ? "bg-yellow-400 animate-pulse"
-                      : "bg-red-400"
-                  }`}
+                    ? "bg-yellow-400 animate-pulse"
+                    : "bg-red-400"
+                }`}
               ></div>
               {connectionStatus}
             </Badge>
@@ -545,13 +643,14 @@ const PatientCallPage = () => {
               <CardContent className="text-center space-y-6">
                 <div className="flex items-center justify-center space-x-2 text-sm">
                   <div
-                    className={`w-3 h-3 rounded-full ${connectionStatus === "Connected" ||
-                        connectionStatus === "Connected with doctor"
+                    className={`w-3 h-3 rounded-full ${
+                      connectionStatus === "Connected" ||
+                      connectionStatus === "Connected with doctor"
                         ? "bg-green-500 animate-pulse"
                         : callStatus === "waiting"
-                          ? "bg-yellow-500 animate-pulse"
-                          : "bg-red-500"
-                      }`}
+                        ? "bg-yellow-500 animate-pulse"
+                        : "bg-red-500"
+                    }`}
                   ></div>
                   <span>{connectionStatus}</span>
                 </div>
