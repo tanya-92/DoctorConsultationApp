@@ -369,8 +369,8 @@ export default function HomePage() {
                 <Link href="/treatments" className={`${darkMode ? "text-gray-300" : "text-gray-600"}`}>
                   Gallery
                 </Link>
-                <Link href="/contact" className={`${darkMode ? "text-gray-300" : "text-gray-600"}`}>
-                  Contact
+                <Link href="/why-choose-us" className={`${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+                  Why Choose Us
                 </Link>
                 <div className="flex flex-col space-y-2 pt-3 border-t border-gray-200">
                   {user ? (

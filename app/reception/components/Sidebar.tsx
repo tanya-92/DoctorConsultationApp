@@ -1,12 +1,9 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   BarChart3Icon,
-  CalendarIcon,
-  UsersIcon,
   CreditCardIcon,
   SettingsIcon,
   StethoscopeIcon,
@@ -17,45 +14,71 @@ import {
 const navigation = [
   { name: "Overview", href: "/reception/overview", icon: BarChart3Icon },
   { name: "Payments", href: "/reception/payments", icon: CreditCardIcon },
+  { name: "Profile Settings", href: "/reception/profile", icon: SettingsIcon },
 ]
 
-export default function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false)
+export default function Sidebar({
+  collapsed,
+  setCollapsed,
+  open,
+  setOpen,
+}: {
+  collapsed: boolean
+  setCollapsed: (val: boolean) => void
+  open: boolean
+  setOpen: (val: boolean) => void
+}) {
   const pathname = usePathname()
 
   return (
     <div
-      className={`${collapsed ? "w-16" : "w-64"} bg-white dark:bg-gray-800 shadow-lg transition-all duration-300 flex flex-col`}
+      className={`fixed md:static inset-y-0 left-0 transform 
+      ${open ? "translate-x-0" : "-translate-x-full"} 
+      md:translate-x-0 transition-transform duration-300 ease-in-out z-50
+      ${collapsed ? "w-16" : "w-64"}
+      bg-white dark:bg-gray-800 shadow-lg flex flex-col h-full`}
     >
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          {!collapsed && (
-            <div className="flex items-center space-x-2">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <StethoscopeIcon className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Dr. Nitin Mishra</h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Reception Desk</p>
-              </div>
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        {!collapsed && (
+          <div className="flex items-center space-x-2">
+            <div className="p-2 bg-blue-600 rounded-lg">
+              <StethoscopeIcon className="h-5 w-5 text-white" />
             </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+                Dr. Nitin Mishra
+              </h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Reception Desk
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Collapse toggle (desktop only) */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="hidden md:flex p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+        >
+          {collapsed ? (
+            <ChevronRightIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+          ) : (
+            <ChevronLeftIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
           )}
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
-          >
-            {collapsed ? (
-              <ChevronRightIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-            ) : (
-              <ChevronLeftIcon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-            )}
-          </button>
-        </div>
+        </button>
+
+        {/* Close button (mobile only) */}
+        <button
+          onClick={() => setOpen(false)}
+          className="md:hidden p-1 rounded-md text-gray-600 dark:text-gray-300"
+        >
+          ←
+        </button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {navigation.map((item) => {
           const isActive = pathname === item.href
           return (
@@ -67,6 +90,7 @@ export default function Sidebar() {
                   ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
                   : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
               }`}
+              onClick={() => setOpen(false)} // mobile pe click ke baad sidebar close
             >
               <item.icon className="h-5 w-5 flex-shrink-0" />
               {!collapsed && <span className="ml-3">{item.name}</span>}

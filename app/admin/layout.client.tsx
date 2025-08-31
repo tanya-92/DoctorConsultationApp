@@ -1,11 +1,9 @@
-"use client"
-import { ThemeProvider } from 'next-themes'
-import type React from "react"
-import { useState, useEffect } from "react"
-import { useAuthState } from "react-firebase-hooks/auth"
-import { doc, getDoc, onSnapshot } from "firebase/firestore"
-import { auth, db } from "@/lib/firebase"
-import { collection, query, where } from "firebase/firestore"
+"use client";
+import type React from "react";
+import { useState, useEffect } from "react";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { doc, onSnapshot, collection, query, where } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import {
   Sidebar,
   SidebarContent,
@@ -17,60 +15,101 @@ import {
   SidebarProvider,
   SidebarTrigger,
   SidebarInset,
-} from "@/components/ui/sidebar"
-import { LayoutDashboard, Calendar, Users, DollarSign, LogOut, Bell, Stethoscope, Phone, MessageCircle, Logs } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { motion } from "framer-motion"
+} from "@/components/ui/sidebar";
+import {
+  LayoutDashboard,
+  Calendar,
+  Users,
+  DollarSign,
+  LogOut,
+  Bell,
+  Stethoscope,
+  Phone,
+  MessageCircle,
+  Logs,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 
 interface DoctorLayoutProps {
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
 export default function DoctorLayout({ children }: DoctorLayoutProps) {
-  const [user] = useAuthState(auth)
-  const [doctorName, setDoctorName] = useState<string>("")
-  const [waitingPatients, setWaitingPatients] = useState<number>(0)
-  const pathname = usePathname()
-  const router = useRouter()
+  const [user] = useAuthState(auth);
+  const [doctorName, setDoctorName] = useState<string>("");
+  const [waitingPatients, setWaitingPatients] = useState<number>(0);
+  const pathname = usePathname();
+  const router = useRouter();
+  const [hasNewCall, setHasNewCall] = useState(false);
+  const [hasNewChat, setHasNewChat] = useState(false);
 
+  const playSound = () => {
+    const audio = new Audio("/notification.mp3"); // file in public/
+    audio.play().catch(() => {});
+  };
+
+  // 🔹 Single useEffect to handle everything
   useEffect(() => {
-    if (user) {
-      fetchDoctorInfo()
-      const waitingQuery = query(collection(db, "chats"), where("status", "==", "waiting"))
-      const unsubscribe = onSnapshot(waitingQuery, (snapshot) => {
-        setWaitingPatients(snapshot.size)
-      })
+    if (!user) return;
 
-      return () => unsubscribe()
-    }
-  }, [user])
-
-  const fetchDoctorInfo = async () => {
-    if (!user) return
-
-    try {
-      const userDoc = await getDoc(doc(db, "users", user.uid))
-      if (userDoc.exists()) {
-        const userData = userDoc.data()
-        setDoctorName(userData.fullName || "Doctor")
+    // Realtime doctor name
+    const unsubName = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setDoctorName(data.fullName || "Doctor");
       }
-    } catch (error) {
-      console.error("Error fetching doctor info:", error)
-    }
-  }
+    });
+
+    // Waiting patients listener
+    const waitingQuery = query(
+      collection(db, "chats"),
+      where("status", "==", "waiting")
+    );
+    const unsubWaiting = onSnapshot(waitingQuery, (snapshot) => {
+      setWaitingPatients(snapshot.size);
+    });
+
+    // Active Calls listener
+    const unsubCalls = onSnapshot(collection(db, "activeCalls"), (snap) => {
+      if (!snap.empty) {
+        setHasNewCall(true);
+        playSound();
+      } else {
+        setHasNewCall(false);
+      }
+    });
+
+    // Active Chats listener
+    const unsubChats = onSnapshot(collection(db, "activeChats"), (snap) => {
+      if (!snap.empty) {
+        setHasNewChat(true);
+        playSound();
+      } else {
+        setHasNewChat(false);
+      }
+    });
+
+    return () => {
+      unsubName();
+      unsubWaiting();
+      unsubCalls();
+      unsubChats();
+    };
+  }, [user]);
 
   const handleLogout = async () => {
     try {
-      await auth.signOut()
-      router.push("/login")
+      await auth.signOut();
+      router.push("/login");
     } catch (error) {
-      console.error("Error signing out:", error)
+      console.error("Error signing out:", error);
     }
-  }
+  };
 
   const menuItems = [
     {
@@ -84,12 +123,14 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
       icon: MessageCircle,
       href: "/admin/chat",
       isActive: pathname === "/admin/chat",
+      badge: hasNewChat ? "●" : undefined,
     },
     {
       title: "Calls",
       icon: Phone,
       href: "/admin/calls",
       isActive: pathname === "/admin/calls",
+      badge: hasNewCall ? "●" : undefined,
     },
     {
       title: "Logs",
@@ -116,7 +157,13 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
       href: "/admin/revenue",
       isActive: pathname === "/admin/revenue",
     },
-  ]
+    {
+      title: "Profile Settings",
+      icon: Users,
+      href: "/admin/profile",
+      isActive: pathname === "/admin/profile",
+    },
+  ];
 
   return (
     <SidebarProvider>
@@ -134,8 +181,12 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
                 <Stethoscope className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Doctor Panel</h2>
-                <p className="text-sm text-slate-600 dark:text-slate-400">Medical Dashboard</p>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Doctor Panel
+                </h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Medical Dashboard
+                </p>
               </div>
             </motion.div>
           </SidebarHeader>
@@ -158,7 +209,10 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
                         <item.icon className="h-5 w-5 transition-transform group-hover:scale-110" />
                         <span className="font-medium">{item.title}</span>
                         {item.badge && (
-                          <Badge variant="destructive" className="ml-auto animate-pulse">
+                          <Badge
+                            variant="destructive"
+                            className="ml-auto animate-pulse"
+                          >
                             {item.badge}
                           </Badge>
                         )}
@@ -193,7 +247,9 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
                   <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
                     {doctorName || "Loading..."}
                   </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">Dermatologist</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Dermatologist
+                  </p>
                 </div>
                 {waitingPatients > 0 && (
                   <div className="relative">
@@ -216,7 +272,7 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
           </SidebarFooter>
         </Sidebar>
 
-        {/* Main Content using SidebarInset for proper full-width layout */}
+        {/* Main Content */}
         <SidebarInset className="flex flex-col">
           <header className="flex h-16 shrink-0 items-center gap-2 border-b border-slate-200/60 dark:border-slate-800/60 px-6 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl">
             <SidebarTrigger className="-ml-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors" />
@@ -230,7 +286,8 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
               >
                 <Bell className="h-4 w-4 animate-pulse" />
                 <span className="text-sm font-medium">
-                  {waitingPatients} patient{waitingPatients > 1 ? "s" : ""} waiting
+                  {waitingPatients} patient{waitingPatients > 1 ? "s" : ""}{" "}
+                  waiting
                 </span>
               </motion.div>
             )}
@@ -240,5 +297,5 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
         </SidebarInset>
       </div>
     </SidebarProvider>
-  )
+  );
 }
