@@ -1,27 +1,20 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Bell } from "lucide-react"
 import { useTodayNotifications } from "./hooks/useTodayNotifications"
-import { useTheme } from "./components/ThemeProvider"
+import { ThemeProvider } from "./components/ThemeProvider"
 import Sidebar from "./components/Sidebar"
 import "../globals.css"
 
 export default function ReceptionLayout({ children }: { children: React.ReactNode }) {
   const { notifications, unread, markAsRead, audioRef } = useTodayNotifications()
   const [showDropdown, setShowDropdown] = useState(false)
-  const { theme } = useTheme()
 
   // 🔹 States for Sidebar
   const [sidebarOpen, setSidebarOpen] = useState(false)   // mobile drawer
   const [collapsed, setCollapsed] = useState(false)       // desktop collapse
-
-  useEffect(() => {
-    const root = window.document.documentElement
-    root.classList.remove("light", "dark")
-    root.classList.add(theme)
-  }, [theme])
 
   const toggleDropdown = () => {
     setShowDropdown(!showDropdown)
@@ -29,8 +22,9 @@ export default function ReceptionLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className={`flex min-h-screen ${theme === "dark" ? "dark" : ""}`}>
-      <div className="flex w-screen">
+    <ThemeProvider defaultTheme="light">
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+        
         {/* -------- Sidebar (works for both desktop & mobile) -------- */}
         <Sidebar
           collapsed={collapsed}
@@ -40,9 +34,11 @@ export default function ReceptionLayout({ children }: { children: React.ReactNod
         />
 
         {/* -------- Main Content Area -------- */}
-        <div className="flex-1 flex flex-col overflow-hidden w-full">
+        <div className="flex-1 flex flex-col overflow-hidden">
+          
           {/* Header */}
-          <div className="flex justify-between items-center p-4 border-b shadow-sm bg-white dark:bg-gray-800 relative">
+          <div className="flex justify-between items-center p-4 border-b shadow-sm bg-white relative">
+            
             {/* Hamburger (mobile only) */}
             <div className="flex items-center">
               <button
@@ -112,13 +108,13 @@ export default function ReceptionLayout({ children }: { children: React.ReactNod
 
           {/* Page Content */}
           <main className="flex-1 overflow-x-hidden overflow-y-auto">
-            <div className="container mx-auto px-6 py-8 w-full">{children}</div>
+            <div className="container mx-auto px-6 py-8">{children}</div>
           </main>
         </div>
       </div>
 
       {/* Hidden Audio for Notifications */}
       <audio ref={audioRef} preload="auto" src="/notification.mp3" />
-    </div>
+    </ThemeProvider>
   )
 }

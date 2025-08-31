@@ -49,26 +49,16 @@ export default function ReceptionOverview() {
   const [sortDesc, setSortDesc] = useState(true);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
-  // Fix: Initialize with null to prevent hydration mismatch
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const calendarRef = useRef<HTMLButtonElement>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const todayDate = new Date();
   const [applySearch, setApplySearch] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [prevIds, setPrevIds] = useState<string[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isUserInteracted, setIsUserInteracted] = useState(false);
-  // Fix: Add mounted state to prevent hydration issues
-  const [mounted, setMounted] = useState(false);
-  // State for delete confirmation
-  const [deleteSuccess, setDeleteSuccess] = useState(false);
-
-  // Fix: Set mounted state and initialize selectedDate after component mounts
-  useEffect(() => {
-    setMounted(true);
-    setSelectedDate(new Date());
-  }, []);
 
   // Helper to check Firestore Timestamp
   const isFirestoreTimestamp = (value: any): boolean => {
@@ -193,11 +183,6 @@ export default function ReceptionOverview() {
     return () => unsubscribe();
   }, [sortDesc]);
 
-  // Fix: Don't render content until component is mounted to prevent hydration issues
-  if (!mounted) {
-    return null;
-  }
-
   // Filter logic
   const formattedSelectedDate = selectedDate
     ? selectedDate.toISOString().split("T")[0]
@@ -233,6 +218,9 @@ export default function ReceptionOverview() {
         ? dateB.getTime() - dateA.getTime()
         : dateA.getTime() - dateB.getTime();
     });
+
+  // State for delete confirmation
+  const [deleteSuccess, setDeleteSuccess] = useState(false);
 
   const handleDeleteConfirmed = async () => {
     try {
@@ -312,16 +300,17 @@ export default function ReceptionOverview() {
           </p>
         </div>
         <Switch
-          checked={active}
-          onChange={toggleStatus}
-          className={`${active ? "bg-green-500" : "bg-red-500"}
-            relative inline-flex h-5 w-10 sm:h-6 sm:w-11 items-center rounded-full transition`}
-        >
-          <span
-            className={`${active ? "translate-x-5 sm:translate-x-6" : "translate-x-1"}
-              inline-block h-3.5 w-3.5 sm:h-4 sm:w-4 transform rounded-full bg-white transition`}
-          />
-        </Switch>
+  checked={active}
+  onChange={toggleStatus}
+  className={`${active ? "bg-green-500" : "bg-red-500"}
+    relative inline-flex h-5 w-10 sm:h-6 sm:w-11 items-center rounded-full transition`}
+>
+  <span
+    className={`${active ? "translate-x-5 sm:translate-x-6" : "translate-x-1"}
+      inline-block h-3.5 w-3.5 sm:h-4 sm:w-4 transform rounded-full bg-white transition`}
+  />
+</Switch>
+
       </div>
 
       {/* Stats Cards */}
@@ -341,6 +330,7 @@ export default function ReceptionOverview() {
       </div>
 
       {/* Sort + Filter */}
+
       <div className="flex flex-wrap gap-2 justify-end items-center mt-4">
         <select
           value={filter}
@@ -351,21 +341,23 @@ export default function ReceptionOverview() {
           <option value="lastMonth">Last Month</option>
           <option value="calendar">By Date</option>
         </select>
-        {filter === "calendar" && selectedDate && (
+        {filter === "calendar" && (
           <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" className="text-sm bg-transparent">
-                {format(selectedDate, "dd MMM yyyy")}
+                {selectedDate
+                  ? format(selectedDate, "dd MMM yyyy")
+                  : "Select Date"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
               <Calendar
                 mode="single"
-                selected={selectedDate}
+                selected={selectedDate ?? undefined}
                 onSelect={(date) => {
                   if (date) {
                     setSelectedDate(date);
-                    setIsCalendarOpen(false);
+                    setIsCalendarOpen(false); // ✅ close calendar
                   }
                 }}
                 initialFocus
@@ -385,7 +377,7 @@ export default function ReceptionOverview() {
           className="ml-2 px-3 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm bg-red-600 hover:bg-red-700 text-white"
           onClick={() => setShowConfirmModal(true)}
         >
-          Delete Last Month's
+          Delete Last Month’s
         </Button>
 
         {showConfirmModal && (
@@ -395,7 +387,7 @@ export default function ReceptionOverview() {
                 Confirm Deletion
               </h2>
               <p className="text-gray-700 dark:text-gray-300 mb-4">
-                Are you sure you want to delete last month's appointments? This
+                Are you sure you want to delete last month’s appointments? This
                 action cannot be undone.
               </p>
               <div className="flex justify-end gap-2">
@@ -417,7 +409,7 @@ export default function ReceptionOverview() {
         )}
         {deleteSuccess && (
           <div className="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow z-50">
-            Last month's appointments deleted successfully!
+            Last month’s appointments deleted successfully!
             <button
               className="ml-3 font-bold"
               onClick={() => setDeleteSuccess(false)}
