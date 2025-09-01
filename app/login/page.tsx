@@ -4,7 +4,7 @@ import { Sun, Moon } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect } from "react";
 import { ArrowLeft, User, Stethoscope, HeartPulse, Smartphone, CalendarCheck } from "lucide-react";
 import { loginUser } from "@/lib/auth";
 import { useAuth } from "@/contexts/auth-context";
@@ -24,8 +23,9 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState("");
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, systemTheme } = useTheme();
   const router = useRouter();
   const { user } = useAuth();
   const { darkMode, toggleDarkMode } = useDarkMode();
@@ -35,16 +35,22 @@ export default function Login() {
     threshold: 0.1,
   });
 
+  // Define superadmin email
+  const SUPERADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "drnitinmishraderma@gmail.com";
+
   useEffect(() => {
     setMounted(true);
-  }, []);
+    // Ensure theme is applied immediately on mount
+    const preferredTheme = darkMode ? "dark" : systemTheme === "dark" ? "dark" : "light";
+    setTheme(preferredTheme);
+  }, [darkMode, setTheme, systemTheme]);
 
   // Redirect if user is already logged in
   useEffect(() => {
     if (user) {
-      router.push("/");
+      handleRedirect(user);
     }
-  }, [user, router]);
+  }, [user]);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -72,8 +78,7 @@ export default function Login() {
       const userCredential = await loginUser(formData.email, formData.password);
       const user = userCredential;
       const token = await user.getIdToken();
-      
-      // Set token cookie
+
       await fetch("/api/setToken", {
         method: "POST",
         headers: {
@@ -82,35 +87,7 @@ export default function Login() {
         body: JSON.stringify({ token }),
       });
 
-      // Check admin email first
-      const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "drnitinmishraderma@gmail.com";
-      if (user.email === ADMIN_EMAIL) {
-        router.push("/admin");
-        return;
-      }
-
-      // Get user data from Firestore
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const userData = docSnap.data();
-        const role = userData.role;
-        
-        if (role) {
-          localStorage.setItem("role", role);
-        }
-
-        if (role === "receptionist") {
-          router.push("/reception");
-        } else {
-          router.push("/");
-        }
-      } else {
-        // User exists in Auth but not in Firestore - still allow login
-        console.log("User not found in Firestore, redirecting to homepage");
-        router.push("/");
-      }
+      handleRedirect(user);
     } catch (error: any) {
       let message = "Login failed. Please check your credentials.";
 
@@ -132,7 +109,101 @@ export default function Login() {
     }
   };
 
-  // Animation variants
+  const handleRedirect = async (user: any) => {
+    setRedirecting(true);
+
+    // First check if user is the superadmin (hardcoded admin)
+    if (user.email === SUPERADMIN_EMAIL) {
+      console.log("Superadmin login detected, redirecting to /admin");
+      setTimeout(() => router.push("/admin"), 1500);
+      return;
+    }
+
+    // For non-superadmin users, check their role in database
+    try {
+      const docRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const userData = docSnap.data();
+        const role = userData.role;
+        console.log("User role from database:", role);
+
+        if (role) localStorage.setItem("role", role);
+
+        setTimeout(() => {
+          // Route based on database role
+          if (role === "admin") {
+            router.push("/admin");
+          } else if (role === "receptionist") {
+            router.push("/reception");
+          } else {
+            router.push("/"); // Default to patient dashboard
+          }
+        }, 1500);
+      } else {
+        console.log("No user document found, redirecting to patient dashboard");
+        setTimeout(() => router.push("/"), 1500);
+      }
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+      // Fallback to patient dashboard if there's an error
+      setTimeout(() => router.push("/"), 1500);
+    }
+  };
+
+  const loadingVariants = {
+    hidden: { opacity: 0, scale: 0.8 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      transition: { duration: 0.5 },
+    },
+  };
+
+  const ringVariants = {
+    animate: {
+      rotate: 360,
+    },
+  };
+
+  if (redirecting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 via-teal-100 to-blue-100 dark:from-slate-900 dark:via-teal-900 dark:to-slate-900">
+        <motion.div
+          variants={loadingVariants}
+          initial="hidden"
+          animate="visible"
+          className="flex flex-col items-center space-y-6 p-8 rounded-2xl bg-white/80 dark:bg-slate-800/80 shadow-2xl backdrop-blur-md"
+        >
+          <motion.div
+            variants={ringVariants}
+            animate="animate"
+            transition={{
+              repeat: Infinity,
+              duration: 1.5,
+              ease: "linear",
+            }}
+            className="relative w-16 h-16"
+          >
+            <div className="absolute inset-0 rounded-full border-4 border-t-blue-500 border-r-teal-500 border-b-blue-500 border-l-teal-500 opacity-50"></div>
+            <motion.div
+              className="absolute inset-0 rounded-full border-4 border-t-blue-600 border-r-transparent border-b-blue-600 border-l-transparent"
+              animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
+              transition={{ repeat: Infinity, duration: 1.2 }}
+            ></motion.div>
+          </motion.div>
+          <p className="text-lg font-semibold text-gray-900 dark:text-white">
+            Preparing your dashboard...
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Please wait a moment
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -156,7 +227,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      {/* Animated Header */}
       <motion.header
         initial={{ y: -100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -218,7 +288,6 @@ export default function Login() {
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-2 gap-12 items-center">
-            {/* Left Column - Features */}
             <motion.div
               ref={ref}
               initial="hidden"
@@ -301,7 +370,6 @@ export default function Login() {
               </motion.div>
             </motion.div>
 
-            {/* Right Column - Login Form */}
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}

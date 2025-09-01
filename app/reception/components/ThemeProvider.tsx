@@ -23,18 +23,42 @@ const initialState: ThemeProviderState = {
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
 
 export function ThemeProvider({ children, defaultTheme = "light", ...props }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(defaultTheme)
+  const [theme, setTheme] = useState<Theme>(() => {
+    // Check localStorage or system preference on the client
+    if (typeof window !== "undefined") {
+      const storedTheme = localStorage.getItem("theme") as Theme | null
+      if (storedTheme) return storedTheme
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : defaultTheme
+    }
+    return defaultTheme
+  })
 
   useEffect(() => {
     const root = window.document.documentElement
     root.classList.remove("light", "dark")
     root.classList.add(theme)
+    localStorage.setItem("theme", theme)
   }, [theme])
+
+  // Add a script to apply the theme immediately on the client
+  useEffect(() => {
+    const script = document.createElement("script")
+    script.innerHTML = `
+      (function() {
+        const storedTheme = localStorage.getItem("theme");
+        const theme = storedTheme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.classList.add(theme);
+      })();
+    `
+    document.body.prepend(script)
+    return () => {
+      document.body.removeChild(script)
+    }
+  }, [])
 
   const value = {
     theme,
     setTheme: (theme: Theme) => {
-      localStorage.setItem("theme", theme)
       setTheme(theme)
     },
   }

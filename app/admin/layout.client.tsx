@@ -50,7 +50,7 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
 
   const playSound = () => {
     const audio = new Audio("/notification.mp3"); // file in public/
-    audio.play().catch(() => {});
+    audio.play().catch(() => { });
   };
 
   // 🔹 Single useEffect to handle everything
@@ -94,6 +94,7 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
       }
     });
 
+
     return () => {
       unsubName();
       unsubWaiting();
@@ -101,6 +102,9 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
       unsubChats();
     };
   }, [user]);
+
+  // Super Admin Email
+  const SUPERADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "drnitinmishraderma@gmail.com";
 
   const handleLogout = async () => {
     try {
@@ -234,7 +238,6 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
               {/* Doctor Info */}
               <div className="flex items-center space-x-3 p-3 bg-gradient-to-r from-teal-50 to-blue-50 dark:from-teal-950/30 dark:to-blue-950/30 rounded-xl border border-teal-100 dark:border-teal-800/30">
                 <Avatar className="h-10 w-10 ring-2 ring-teal-200 dark:ring-teal-700">
-                  <AvatarImage src="/placeholder.svg?height=40&width=40" />
                   <AvatarFallback className="bg-gradient-to-r from-teal-600 to-blue-600 text-white font-semibold">
                     {doctorName
                       .split(" ")
@@ -248,7 +251,9 @@ export default function DoctorLayout({ children }: DoctorLayoutProps) {
                     {doctorName || "Loading..."}
                   </p>
                   <p className="text-xs text-slate-600 dark:text-slate-400">
-                    Dermatologist
+                    {user?.email?.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase()
+                      ? "Doctor"
+                      : "Admin"}
                   </p>
                 </div>
                 {waitingPatients > 0 && (

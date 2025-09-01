@@ -11,6 +11,12 @@ import {
   ChevronRightIcon,
 } from "./Icons"
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useAuth } from "@/contexts/auth-context"
+import { useEffect, useState } from "react"
+import { db } from "@/lib/firebase"
+import { doc, getDoc } from "firebase/firestore"
+
 const navigation = [
   { name: "Overview", href: "/reception/overview", icon: BarChart3Icon },
   { name: "Payments", href: "/reception/payments", icon: CreditCardIcon },
@@ -29,6 +35,24 @@ export default function Sidebar({
   setOpen: (val: boolean) => void
 }) {
   const pathname = usePathname()
+  const { user } = useAuth()
+  const [receptionName, setReceptionName] = useState("")
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      if (user) {
+        const docRef = doc(db, "users", user.uid)
+        const docSnap = await getDoc(docRef)
+        if (docSnap.exists()) {
+          const data = docSnap.data()
+          setReceptionName(data.fullName || "")
+        } else {
+          setReceptionName("")
+        }
+      }
+    }
+    fetchUser()
+  }, [user])
 
   return (
     <div
@@ -42,17 +66,23 @@ export default function Sidebar({
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         {!collapsed && (
           <div className="flex items-center space-x-2">
-            <div className="p-2 bg-blue-600 rounded-lg">
-              <StethoscopeIcon className="h-5 w-5 text-white" />
-            </div>
+            <Avatar className="h-10 w-10 ring-2 ring-teal-200 dark:ring-teal-700">
+              <AvatarFallback className="bg-gradient-to-r from-teal-600 to-blue-600 text-white font-semibold">
+                {(receptionName
+                  ? receptionName
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                  : "RC").toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
             <div>
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                Dr. Nitin Mishra
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                {receptionName || "Reception User"}
               </h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Reception Desk
-              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Receptionist</p>
             </div>
+
           </div>
         )}
 
@@ -85,12 +115,11 @@ export default function Sidebar({
             <Link
               key={item.name}
               href={item.href}
-              className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
-                  : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
-              }`}
-              onClick={() => setOpen(false)} // mobile pe click ke baad sidebar close
+              className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
+                ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
+                : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                }`}
+              onClick={() => setOpen(false)} // close sidebar on mobile
             >
               <item.icon className="h-5 w-5 flex-shrink-0" />
               {!collapsed && <span className="ml-3">{item.name}</span>}

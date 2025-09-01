@@ -15,7 +15,10 @@ import {
   Timestamp,
   onSnapshot,
   updateDoc,
+  doc,
+  serverTimestamp,
 } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Input } from "@/components/ui/input";
@@ -23,15 +26,13 @@ import {
   Calendar,
   Users,
   DollarSign,
-  Activity,
-  Clock,
-  TrendingUp,
+  MessageCircle,
+  Video,
   ArrowRight,
   Sparkles,
-  Video,
-  MessageCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface DashboardStats {
   totalAppointments: number;
@@ -48,11 +49,15 @@ interface RecentActivity {
   status: string;
 }
 
-export default function DoctorDashboard() {
+const SUPERADMIN_EMAIL =
+  process.env.NEXT_PUBLIC_ADMIN_EMAIL || "drnitinmishraderma@gmail.com";
+
+export default function AdminDashboard() {
+  const router = useRouter();
   const [hasNewAppointment, setHasNewAppointment] = useState(false);
   const [lastNotifiedId, setLastNotifiedId] = useState("");
   const [user] = useAuthState(auth);
-  const { role, updateRole, loading: roleLoading } = useUserRole();
+  const { role, loading: roleLoading } = useUserRole();
   const [stats, setStats] = useState<DashboardStats>({
     totalAppointments: 0,
     todayAppointments: 0,
@@ -61,70 +66,46 @@ export default function DoctorDashboard() {
   });
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [allUsers, setAllUsers] = useState<
+    Array<{ email: string; role: string; uid: string }>
+  >([]);
+  const [emailInput, setEmailInput] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filteredUsers, setFilteredUsers] = useState<
+    Array<{ email: string; role: string; uid: string }>
+  >([]);
+
   const doctorFee = Number.parseInt(
     process.env.NEXT_PUBLIC_DOCTOR_FEE || "500"
   );
 
-  // Helper function to check if a document is the toggle document
+  // Toggle filter helper (unchanged)
   const isToggleDocument = (docData: any) => {
     const keys = Object.keys(docData).map((k) => k.toLowerCase());
-
     const isToggle =
-      typeof docData.active === "boolean" && // your toggle doc
-      keys.length === 1 && // only has "active"
+      typeof docData.active === "boolean" &&
+      keys.length === 1 &&
       !keys.includes("patientname") &&
       !keys.includes("patientemail") &&
       !keys.includes("date");
-
-    if (isToggle) {
-      console.log("Filtered toggle document:", docData);
-    }
     return isToggle;
   };
 
-  // Example initialization for allDocs (empty array to avoid error, actual value set in useEffect)
-  const allDocs: Array<{ id: string; data: any }> = [];
-
-  const actualAppointments = allDocs.filter(
-    (doc) => !isToggleDocument(doc.data)
-  );
-  console.log("Docs after filter:", actualAppointments.length);
-
-  // Helper function to parse date from various formats
   const parseAppointmentDate = (dateField: any): Date | null => {
     if (!dateField) return null;
-
     try {
-      // Firestore Timestamp
-      if (dateField && typeof dateField.toDate === "function") {
-        return dateField.toDate();
-      }
-
-      // String date
-      if (typeof dateField === "string") {
-        return new Date(dateField);
-      }
-
-      // Already a Date object
-      if (dateField instanceof Date) {
-        return dateField;
-      }
-
-      // Firestore Timestamp object format
+      if (dateField && typeof dateField.toDate === "function") return dateField.toDate();
+      if (typeof dateField === "string") return new Date(dateField);
+      if (dateField instanceof Date) return dateField;
       if (dateField.seconds && dateField.nanoseconds !== undefined) {
-        return new Date(
-          dateField.seconds * 1000 + dateField.nanoseconds / 1000000
-        );
+        return new Date(dateField.seconds * 1000 + dateField.nanoseconds / 1e6);
       }
-
       return null;
-    } catch (error) {
-      console.error("Error parsing date:", error, dateField);
+    } catch {
       return null;
     }
   };
 
-  // Helper function to check if date is today
   const isToday = (date: Date): boolean => {
     const today = new Date();
     return (
@@ -137,193 +118,131 @@ export default function DoctorDashboard() {
   useEffect(() => {
     if (user) {
       fetchDashboardData();
+      fetchAllUsers();
     }
-
-    // Listen to real-time updates from "appointments"
-    const unsubscribe = onSnapshot(
-      collection(db, "appointments"),
-      (snapshot) => {
-        console.log("📊 Real-time update - Total docs:", snapshot.docs.length);
-
-        // Get all documents and their data for debugging
-        const allDocs = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          data: doc.data(),
-        }));
-
-        console.log("📊 All documents:", allDocs);
-
-        // Log all documents to find the toggle document
-        allDocs.forEach((doc) => {
-          const data = doc.data;
-          const isToggle = isToggleDocument(data);
-          if (typeof data.appointmentstatus === "boolean") {
-            console.log("📊 Document with appointmentstatus boolean:", {
-              id: doc.id,
-              appointmentstatus: data.appointmentstatus,
-              hasPatientName: !!data.patientName,
-              hasPatientEmail: !!data.patientEmail,
-              hasDate: !!data.date,
-              isToggle: isToggle,
-              allFields: Object.keys(data),
-            });
-          }
-        });
-
-        // Filter out toggle documents
-        const actualAppointments = allDocs.filter(
-          (doc) => !isToggleDocument(doc.data)
-        );
-        console.log(
-          "📊 After filtering toggle docs:",
-          actualAppointments.length
-        );
-
-        // Get today's appointments
-        const todayAppointments = actualAppointments.filter((doc) => {
-          const appointmentDate = parseAppointmentDate(doc.data.date);
-          if (!appointmentDate) {
-            console.log(
-              "📊 Could not parse date for doc:",
-              doc.id,
-              doc.data.date
-            );
-            return false;
-          }
-
-          const isTodayAppt = isToday(appointmentDate);
-          if (isTodayAppt) {
-            console.log("📊 Today appointment found:", doc.id, appointmentDate);
-          }
-          return isTodayAppt;
-        });
-
-        console.log("📊 Today appointments found:", todayAppointments.length);
-
-        const totalAppointments = actualAppointments.length;
-        const todayCount = todayAppointments.length;
-
-        const totalRevenue =
-          actualAppointments.filter((doc) => doc.data.status === "completed")
-            .length * doctorFee;
-
-        // Update debug info
-
-        setStats((prev) => ({
-          ...prev,
-          todayAppointments: todayCount,
-          totalAppointments,
-          totalRevenue,
-        }));
-      }
-    );
-
+    const unsubscribe = onSnapshot(collection(db, "appointments"), (snapshot) => {
+      const allDocs = snapshot.docs.map((d) => ({ id: d.id, data: d.data() }));
+      const actualAppointments = allDocs.filter((doc) => !isToggleDocument(doc.data));
+      const todayAppointments = actualAppointments.filter((doc) => {
+        const dt = parseAppointmentDate(doc.data.date);
+        return dt ? isToday(dt) : false;
+      });
+      const totalAppointments = actualAppointments.length;
+      const totalRevenue =
+        actualAppointments.filter((doc) => doc.data.status === "completed").length * doctorFee;
+      setStats((prev) => ({
+        ...prev,
+        todayAppointments: todayAppointments.length,
+        totalAppointments,
+        totalRevenue,
+      }));
+    });
     return () => unsubscribe();
   }, [user, doctorFee]);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      console.log("📊 Fetching dashboard data...");
-
-      // Get all appointments
       const appointmentsQuery = query(collection(db, "appointments"));
       const appointmentsSnapshot = await getDocs(appointmentsQuery);
-
-      console.log("📊 Total docs in collection:", appointmentsSnapshot.size);
-
-      // Filter out toggle documents
-      const actualAppointmentDocs = appointmentsSnapshot.docs.filter((doc) => {
-        const data = doc.data();
-        const isToggle = isToggleDocument(data);
-        if (isToggle) {
-          console.log("📊 Toggle document found:", doc.id, data);
-        }
-        return !isToggle;
-      });
-
+      const actualAppointmentDocs = appointmentsSnapshot.docs.filter(
+        (d) => !isToggleDocument(d.data())
+      );
       const totalAppointments = actualAppointmentDocs.length;
-      console.log("📊 Actual appointments after filtering:", totalAppointments);
 
-      // Get today's appointments
-      const todayAppointments = actualAppointmentDocs.filter((doc) => {
-        const data = doc.data();
-        const appointmentDate = parseAppointmentDate(data.date);
-
-        if (!appointmentDate) {
-          console.log("📊 Could not parse date for doc:", doc.id, data.date);
-          return false;
-        }
-
-        const isTodayAppt = isToday(appointmentDate);
-        if (isTodayAppt) {
-          console.log(
-            "📊 Today appointment found:",
-            doc.id,
-            appointmentDate,
-            data
-          );
-        }
-        return isTodayAppt;
+      const todayAppointments = actualAppointmentDocs.filter((d) => {
+        const dt = parseAppointmentDate(d.data().date);
+        return dt ? isToday(dt) : false;
       });
 
-      const todayCount = todayAppointments.length;
-      console.log("📊 Today appointments count:", todayCount);
-
-      // Calculate revenue from completed appointments
       const completedAppointments = actualAppointmentDocs.filter(
-        (doc) => doc.data().status === "completed"
+        (d) => d.data().status === "completed"
       );
       const totalRevenue = completedAppointments.length * doctorFee;
 
-      // Get active patients in last 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
       const recentChatsQuery = query(
         collection(db, "chats"),
         where("createdAt", ">=", Timestamp.fromDate(thirtyDaysAgo))
       );
       const recentChatsSnapshot = await getDocs(recentChatsQuery);
       const activePatients = new Set(
-        recentChatsSnapshot.docs.map((doc) => doc.data().patientEmail)
+        recentChatsSnapshot.docs.map((d) => d.data().patientEmail)
       ).size;
 
       setStats({
         totalAppointments,
-        todayAppointments: todayCount,
+        todayAppointments: todayAppointments.length,
         totalRevenue,
         activePatients,
       });
 
-      // Get recent activity
       const recentQuery = query(
         collection(db, "appointments"),
         orderBy("createdAt", "desc"),
         limit(10)
       );
       const recentSnapshot = await getDocs(recentQuery);
-
       const activities: RecentActivity[] = recentSnapshot.docs
-        .filter((doc) => !isToggleDocument(doc.data()))
+        .filter((d) => !isToggleDocument(d.data()))
         .slice(0, 5)
-        .map((doc) => {
-          const data = doc.data();
+        .map((d) => {
+          const data = d.data() as any;
           return {
-            id: doc.id,
+            id: d.id,
             type: "appointment",
             patient: data.patientName || "Unknown Patient",
             time: data.createdAt?.toDate?.()?.toLocaleTimeString() || "Unknown",
             status: data.status || "pending",
           };
         });
-
       setRecentActivity(activities);
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchAllUsers = async () => {
+    try {
+      const usersQuery = query(collection(db, "users"));
+      const usersSnapshot = await getDocs(usersQuery);
+      const users = usersSnapshot.docs
+        .map((doc) => {
+          const data = doc.data() as any;
+          return {
+            uid: doc.id,
+            email: data.email || "",
+            role: data.role || "patient",
+          };
+        })
+        .filter((u) => u.email);
+      setAllUsers(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
+
+  const handleEmailInputChange = (value: string) => {
+    setEmailInput(value);
+    if (value.length > 0) {
+      const filtered = allUsers.filter(
+        (u) =>
+          u.email.toLowerCase().includes(value.toLowerCase()) &&
+          u.email.toLowerCase() !== SUPERADMIN_EMAIL.toLowerCase()
+      );
+      setFilteredUsers(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setFilteredUsers([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSuggestionSelect = (email: string) => {
+    setEmailInput(email);
+    setShowSuggestions(false);
+    setFilteredUsers([]);
   };
 
   const quickAccessCards = [
@@ -400,7 +319,7 @@ export default function DoctorDashboard() {
 
   return (
     <div className="space-y-8 max-w-full">
-      {/* Welcome Section */}
+      {/* Welcome */}
       <motion.div
         className="mb-8"
         initial={{ opacity: 0, y: -20 }}
@@ -418,7 +337,7 @@ export default function DoctorDashboard() {
         </p>
       </motion.div>
 
-      {/* Quick Access Cards */}
+      {/* Quick Access */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {quickAccessCards.map((card, index) => (
           <motion.div
@@ -430,9 +349,7 @@ export default function DoctorDashboard() {
             className="group"
           >
             <Link href={card.href}>
-              <Card
-                className={`${card.bgColor} border-0 shadow-xl hover:shadow-2xl transition-all duration-500 cursor-pointer overflow-hidden relative`}
-              >
+              <Card className={`${card.bgColor} border-0 shadow-xl hover:shadow-2xl transition-all duration-500 cursor-pointer overflow-hidden relative`}>
                 <div className="absolute inset-0 bg-gradient-to-r opacity-0 group-hover:opacity-10 transition-opacity duration-500" />
                 <CardContent className="p-8">
                   <div className="flex items-center justify-between">
@@ -448,9 +365,7 @@ export default function DoctorDashboard() {
                         whileHover={{ x: 5 }}
                         transition={{ type: "spring", stiffness: 400 }}
                       >
-                        <span className="font-semibold text-lg">
-                          Access now
-                        </span>
+                        <span className="font-semibold text-lg">Access now</span>
                         <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
                       </motion.div>
                     </div>
@@ -469,7 +384,7 @@ export default function DoctorDashboard() {
         ))}
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {statsCards.map((stat, index) => (
           <motion.div
@@ -479,9 +394,7 @@ export default function DoctorDashboard() {
             transition={{ delay: index * 0.1 + 0.3, duration: 0.5 }}
             whileHover={{ y: -3 }}
           >
-            <Card
-              className={`${stat.bgColor} border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group overflow-hidden relative`}
-            >
+            <Card className={`${stat.bgColor} border-0 shadow-xl hover:shadow-2xl transition-all duration-300 group overflow-hidden relative`}>
               <div className="absolute inset-0 bg-gradient-to-r opacity-0 group-hover:opacity-5 transition-opacity duration-300" />
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -505,98 +418,143 @@ export default function DoctorDashboard() {
             </Card>
           </motion.div>
         ))}
-        {/* User Role Management Section (Admin Only) */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full mt-10"
-        >
-          <Card className="w-full bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-xl border-slate-200/60 dark:border-slate-700/60">
-            <CardHeader>
-              <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
-                User Role Management
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.currentTarget;
-                  const roleEl = form.elements.namedItem(
-                    "role"
-                  ) as HTMLSelectElement | null;
-                  const emailEl = form.elements.namedItem(
-                    "email"
-                  ) as HTMLInputElement | null;
+      </div>
 
-                  const role = roleEl?.value.trim();
-                  const email = emailEl?.value.trim().toLowerCase(); // normalize email
+      {/* User Role Management */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full mt-10"
+      >
+        <Card className="w-full bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-xl border-slate-200/60 dark:border-slate-700/60">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold text-slate-900 dark:text-white">
+              User Role Management
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.currentTarget;
+                const roleEl = form.elements.namedItem("role") as HTMLSelectElement | null;
 
-                  if (!email || !role) {
-                    alert("Please provide email and select role");
+                const newRole = roleEl?.value.trim() as
+                  | "patient"
+                  | "receptionist"
+                  | "admin"
+                  | "";
+
+                const email = emailInput.trim().toLowerCase();
+
+                if (!email || !newRole) {
+                  alert("Please provide email and select role");
+                  return;
+                }
+
+                if (email === SUPERADMIN_EMAIL.toLowerCase()) {
+                  alert("Error: Cannot change the role of the superadmin account!");
+                  return;
+                }
+
+                try {
+                  const usersRef = collection(db, "users");
+                  const q = query(usersRef, where("email", "==", email));
+                  const qs = await getDocs(q);
+
+                  if (qs.empty) {
+                    alert("User not found. Please check the email.");
                     return;
                   }
 
-                  try {
-                    // Step 1: Find user document by email field
-                    const usersRef = collection(db, "users");
-                    const q = query(usersRef, where("email", "==", email));
-                    const querySnapshot = await getDocs(q);
+                  const targetDoc = qs.docs[0];
 
-                    if (querySnapshot.empty) {
-                      alert("User not found. Please check the email.");
-                      return;
-                    }
+                  // Single atomic update with forceLogout
+                  await updateDoc(targetDoc.ref, {
+                    role: newRole,
+                    forceLogout: true,
+                    forceLogoutAt: serverTimestamp(),
+                  });
 
-                    // Step 2: Update the role and set forceLogout flag
-                    const userDoc = querySnapshot.docs[0];
-                    await updateDoc(userDoc.ref, {
-                      role,
-                      forceLogout: true, // Set flag to force logout
-                    });
-                    setTimeout(async () => {
-                      await updateDoc(userDoc.ref, { role });
-                    }, 1000); 
+                  alert(`Role updated to '${newRole}' for ${email}. User will be logged out.`);
 
-                    alert(
-                      `Role updated to '${role}' for ${email}. User will be logged out.`
-                    );
-                    form.reset();
-                  } catch (err) {
-                    console.error(err);
-                    alert("Failed to update role. Try again.");
+                  // If the admin just changed *their own* role, log out immediately
+                  if (user?.email?.toLowerCase() === email) {
+                    await signOut(auth);
+                    router.push("/login");
                   }
-                }}
-                className="space-y-4"
-              >
-                <div className="flex flex-col md:flex-row gap-4 w-full">
+
+                  // Reset form
+                  setEmailInput("");
+                  setShowSuggestions(false);
+                  setFilteredUsers([]);
+                  if (roleEl) roleEl.value = "";
+                } catch (err) {
+                  console.error(err);
+                  alert("Failed to update role. Try again.");
+                }
+              }}
+              className="space-y-4"
+            >
+              <div className="flex flex-col md:flex-row gap-4 w-full">
+                <div className="flex-1 relative">
                   <Input
-                    name="email"
+                    value={emailInput}
+                    onChange={(e) => handleEmailInputChange(e.target.value)}
+                    onFocus={() =>
+                      emailInput.length > 0 &&
+                      filteredUsers.length > 0 &&
+                      setShowSuggestions(true)
+                    }
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                     placeholder="Enter user email..."
                     className="flex-1"
+                    autoComplete="off"
                   />
-                  <select
-                    name="role"
-                    className="border rounded-md px-4 py-2 dark:bg-slate-700 dark:text-white dark:border-slate-600"
-                  >
-                    <option value="">Select role</option>
-                    <option value="patient">Patient</option>
-                    <option value="receptionist">Receptionist</option>
-                    <option value="admin">Admin</option>
-                  </select>
+                  {showSuggestions && (
+                    <div className="absolute top-full left-0 right-0 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
+                      {filteredUsers.map((u) => (
+                        <div
+                          key={u.uid}
+                          onClick={() => handleSuggestionSelect(u.email)}
+                          className="px-4 py-3 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-200 dark:border-slate-700 last:border-b-0"
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-900 dark:text-white">{u.email}</span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-600 px-2 py-1 rounded">
+                              {u.role}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      {filteredUsers.length === 0 && emailInput.length > 0 && (
+                        <div className="px-4 py-3 text-slate-500 dark:text-slate-400 text-center">
+                          No users found matching "{emailInput}"
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <Button
-                  type="submit"
-                  className="bg-blue-600 text-white hover:bg-blue-700"
+
+                <select
+                  name="role"
+                  className="border rounded-md px-4 py-2 dark:bg-slate-700 dark:text-white dark:border-slate-600"
                 >
-                  Update Role
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
+                  <option value="">Select role</option>
+                  <option value="patient">Patient</option>
+                  <option value="receptionist">Receptionist</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+
+              <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700">
+                Update Role
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }

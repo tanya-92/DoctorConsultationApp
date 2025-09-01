@@ -103,6 +103,9 @@ function LiveChatContent() {
     urgency: "",
   });
 
+  const [showSummary, setShowSummary] = useState(false);
+  const [previousInfo, setPreviousInfo] = useState<typeof preFormData | null>(null);
+
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
@@ -136,9 +139,7 @@ function LiveChatContent() {
     return Object.keys(errors).length === 0;
   };
 
-  const handlePreFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const startChat = async () => {
     if (!validateForm()) {
       return;
     }
@@ -256,8 +257,14 @@ function LiveChatContent() {
         }
 
         console.log("=== Document operation completed successfully ===");
+
+        // Save lastPatientInfo to user document
+        const userDocRef = doc(db, "users", user.uid);
+        await updateDoc(userDocRef, {
+          lastPatientInfo: preFormData,
+        });
       } catch (error: any) {
-        console.error("=== ERROR in handlePreFormSubmit ===");
+        console.error("=== ERROR in startChat ===");
         console.error("Error type:", error.constructor.name);
         console.error("Error message:", error.message);
         console.error("Error code:", error.code);
@@ -281,6 +288,11 @@ function LiveChatContent() {
         timestamp: new Date(),
       },
     ]);
+  };
+
+  const handlePreFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await startChat();
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -358,14 +370,6 @@ function LiveChatContent() {
           console.log("=== AUTH STATE CHANGE ===");
           console.log("User logged in:", loggedInUser.email);
 
-          setPreFormData((prev) => ({
-            ...prev,
-            name:
-              loggedInUser.displayName ||
-              loggedInUser.email?.split("@")[0] ||
-              "",
-          }));
-
           try {
             const userDocRef = doc(db, "users", loggedInUser.uid);
             const userDoc = await getDoc(userDocRef);
@@ -387,8 +391,33 @@ function LiveChatContent() {
               } else {
                 console.log("❌ User document creation failed verification");
               }
+              setPreFormData({
+                name: loggedInUser.displayName || loggedInUser.email?.split("@")[0] || "",
+                age: "",
+                gender: "",
+                symptoms: "",
+                contact: "",
+                urgency: "",
+              });
+              setShowSummary(false);
             } else {
               console.log("✅ User document already exists:", userDoc.data());
+              const data = userDoc.data();
+              if (data.lastPatientInfo) {
+                setPreviousInfo(data.lastPatientInfo);
+                setPreFormData(data.lastPatientInfo);
+                setShowSummary(true);
+              } else {
+                setPreFormData({
+                  name: loggedInUser.displayName || loggedInUser.email?.split("@")[0] || "",
+                  age: "",
+                  gender: "",
+                  symptoms: "",
+                  contact: "",
+                  urgency: "",
+                });
+                setShowSummary(false);
+              }
             }
           } catch (userCreationError) {
             console.error(
@@ -727,201 +756,273 @@ function LiveChatContent() {
                 </p>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handlePreFormSubmit} className="space-y-6">
-                  <div>
-                    <Label htmlFor="name" className="dark:text-gray-100">
-                      Full Name *
-                    </Label>
-                    <Input
-                      id="name"
-                      value={preFormData.name}
-                      onChange={(e) =>
-                        handleInputChange("name", e.target.value)
-                      }
-                      className={`bg-white/50 dark:bg-gray-700/50 dark:text-gray-100 ${
-                        formErrors.name ? "border-red-500" : ""
-                      }`}
-                      placeholder="Enter your full name"
-                    />
-                    {formErrors.name && (
-                      <p className="text-red-500 text-sm mt-1">
-                        {formErrors.name}
-                      </p>
-                    )}
+                {showSummary ? (
+                  <div className="space-y-6">
+                    <div className="space-y-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Name:</span>
+                        <span className="font-medium">{preFormData.name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Age:</span>
+                        <span className="font-medium">{preFormData.age}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Gender:
+                        </span>
+                        <span className="font-medium capitalize">
+                          {preFormData.gender}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Contact:
+                        </span>
+                        <span className="font-medium">{preFormData.contact}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Urgency:
+                        </span>
+                        <Badge
+                          variant={
+                            preFormData.urgency === "high"
+                              ? "destructive"
+                              : preFormData.urgency === "medium"
+                              ? "default"
+                              : "secondary"
+                          }
+                        >
+                          {preFormData.urgency}
+                        </Badge>
+                      </div>
+                      <div className="mt-4">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Symptoms:
+                        </span>
+                        <p className="text-sm text-gray-800 dark:text-gray-300 leading-relaxed mt-1">
+                          {preFormData.symptoms}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Use this for the same patient, or edit for changes or new patient.
+                    </p>
+                    <Button
+                      onClick={startChat}
+                      className="w-full bg-blue-600 hover:bg-blue-700 shadow-lg"
+                      size="lg"
+                    >
+                      <MessageCircle className="h-5 w-5 mr-2" />
+                      Continue with These Details
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowSummary(false)}
+                      className="w-full"
+                      size="lg"
+                    >
+                      Edit Details or New Patient
+                    </Button>
                   </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
+                ) : (
+                  <form onSubmit={handlePreFormSubmit} className="space-y-6">
                     <div>
-                      <Label htmlFor="age" className="dark:text-gray-100">
-                        Age *
+                      <Label htmlFor="name" className="dark:text-gray-100">
+                        Full Name *
                       </Label>
                       <Input
-                        id="age"
-                        type="number"
-                        value={preFormData.age}
+                        id="name"
+                        value={preFormData.name}
                         onChange={(e) =>
-                          handleInputChange("age", e.target.value)
+                          handleInputChange("name", e.target.value)
                         }
                         className={`bg-white/50 dark:bg-gray-700/50 dark:text-gray-100 ${
-                          formErrors.age ? "border-red-500" : ""
+                          formErrors.name ? "border-red-500" : ""
                         }`}
-                        min="5"
-                        max="100"
-                        placeholder="Your age"
+                        placeholder="Enter your full name"
                       />
-                      {formErrors.age && (
+                      {formErrors.name && (
                         <p className="text-red-500 text-sm mt-1">
-                          {formErrors.age}
+                          {formErrors.name}
                         </p>
                       )}
                     </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="age" className="dark:text-gray-100">
+                          Age *
+                        </Label>
+                        <Input
+                          id="age"
+                          type="number"
+                          value={preFormData.age}
+                          onChange={(e) =>
+                            handleInputChange("age", e.target.value)
+                          }
+                          className={`bg-white/50 dark:bg-gray-700/50 dark:text-gray-100 ${
+                            formErrors.age ? "border-red-500" : ""
+                          }`}
+                          min="5"
+                          max="100"
+                          placeholder="Your age"
+                        />
+                        {formErrors.age && (
+                          <p className="text-red-500 text-sm mt-1">
+                            {formErrors.age}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="gender" className="dark:text-gray-100">
+                          Gender *
+                        </Label>
+                        <Select
+                          value={preFormData.gender}
+                          onValueChange={(value) =>
+                            handleInputChange("gender", value)
+                          }
+                        >
+                          <SelectTrigger
+                            className={`bg-white/50 dark:bg-gray-700/50 ${
+                              formErrors.gender ? "border-red-500" : ""
+                            }`}
+                          >
+                            <SelectValue
+                              placeholder="Select gender"
+                              className="dark:text-gray-100"
+                            />
+                          </SelectTrigger>
+                          <SelectContent className="dark:bg-gray-700 dark:text-gray-100">
+                            <SelectItem value="male">Male</SelectItem>
+                            <SelectItem value="female">Female</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {formErrors.gender && (
+                          <p className="text-red-500 text-sm mt-1">
+                            {formErrors.gender}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
                     <div>
-                      <Label htmlFor="gender" className="dark:text-gray-100">
-                        Gender *
+                      <Label htmlFor="contact" className="dark:text-gray-100">
+                        Contact Number *
+                      </Label>
+                      <Input
+                        id="contact"
+                        type="tel"
+                        value={preFormData.contact}
+                        onChange={(e) =>
+                          handleInputChange("contact", e.target.value)
+                        }
+                        className={`bg-white/50 dark:bg-gray-700/50 dark:text-gray-100 ${
+                          formErrors.contact ? "border-red-500" : ""
+                        }`}
+                        placeholder="9258924611"
+                      />
+                      {formErrors.contact && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {formErrors.contact}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="symptoms" className="dark:text-gray-100">
+                        Symptoms / Chief Complaint *
+                      </Label>
+                      <Textarea
+                        id="symptoms"
+                        placeholder="Please describe your symptoms, skin condition, or reason for consultation in detail..."
+                        value={preFormData.symptoms}
+                        onChange={(e) =>
+                          handleInputChange("symptoms", e.target.value)
+                        }
+                        className={`bg-white/50 min-h-[120px] dark:bg-gray-700/50 dark:text-gray-100 ${
+                          formErrors.symptoms ? "border-red-500" : ""
+                        }`}
+                      />
+                      {formErrors.symptoms && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {formErrors.symptoms}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="urgency" className="dark:text-gray-100">
+                        Urgency Level *
                       </Label>
                       <Select
-                        value={preFormData.gender}
+                        value={preFormData.urgency}
                         onValueChange={(value) =>
-                          handleInputChange("gender", value)
+                          handleInputChange("urgency", value)
                         }
                       >
                         <SelectTrigger
                           className={`bg-white/50 dark:bg-gray-700/50 ${
-                            formErrors.gender ? "border-red-500" : ""
+                            formErrors.urgency ? "border-red-500" : ""
                           }`}
                         >
                           <SelectValue
-                            placeholder="Select gender"
+                            placeholder="Select urgency level"
                             className="dark:text-gray-100"
                           />
                         </SelectTrigger>
                         <SelectContent className="dark:bg-gray-700 dark:text-gray-100">
-                          <SelectItem value="male">Male</SelectItem>
-                          <SelectItem value="female">Female</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
+                          <SelectItem value="low">
+                            Low - General inquiry/routine consultation
+                          </SelectItem>
+                          <SelectItem value="medium">
+                            Medium - Concerning symptoms
+                          </SelectItem>
+                          <SelectItem value="high">
+                            High - Urgent consultation needed
+                          </SelectItem>
                         </SelectContent>
                       </Select>
-                      {formErrors.gender && (
+                      {formErrors.urgency && (
                         <p className="text-red-500 text-sm mt-1">
-                          {formErrors.gender}
+                          {formErrors.urgency}
                         </p>
                       )}
                     </div>
-                  </div>
 
-                  <div>
-                    <Label htmlFor="contact" className="dark:text-gray-100">
-                      Contact Number *
-                    </Label>
-                    <Input
-                      id="contact"
-                      type="tel"
-                      value={preFormData.contact}
-                      onChange={(e) =>
-                        handleInputChange("contact", e.target.value)
-                      }
-                      className={`bg-white/50 dark:bg-gray-700/50 dark:text-gray-100 ${
-                        formErrors.contact ? "border-red-500" : ""
-                      }`}
-                      placeholder="9258924611"
-                    />
-                    {formErrors.contact && (
-                      <p className="text-red-500 text-sm mt-1">
-                        {formErrors.contact}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="symptoms" className="dark:text-gray-100">
-                      Symptoms / Chief Complaint *
-                    </Label>
-                    <Textarea
-                      id="symptoms"
-                      placeholder="Please describe your symptoms, skin condition, or reason for consultation in detail..."
-                      value={preFormData.symptoms}
-                      onChange={(e) =>
-                        handleInputChange("symptoms", e.target.value)
-                      }
-                      className={`bg-white/50 min-h-[120px] dark:bg-gray-700/50 dark:text-gray-100 ${
-                        formErrors.symptoms ? "border-red-500" : ""
-                      }`}
-                    />
-                    {formErrors.symptoms && (
-                      <p className="text-red-500 text-sm mt-1">
-                        {formErrors.symptoms}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="urgency" className="dark:text-gray-100">
-                      Urgency Level *
-                    </Label>
-                    <Select
-                      value={preFormData.urgency}
-                      onValueChange={(value) =>
-                        handleInputChange("urgency", value)
-                      }
-                    >
-                      <SelectTrigger
-                        className={`bg-white/50 dark:bg-gray-700/50 ${
-                          formErrors.urgency ? "border-red-500" : ""
-                        }`}
-                      >
-                        <SelectValue
-                          placeholder="Select urgency level"
-                          className="dark:text-gray-100"
-                        />
-                      </SelectTrigger>
-                      <SelectContent className="dark:bg-gray-700 dark:text-gray-100">
-                        <SelectItem value="low">
-                          Low - General inquiry/routine consultation
-                        </SelectItem>
-                        <SelectItem value="medium">
-                          Medium - Concerning symptoms
-                        </SelectItem>
-                        <SelectItem value="high">
-                          High - Urgent consultation needed
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {formErrors.urgency && (
-                      <p className="text-red-500 text-sm mt-1">
-                        {formErrors.urgency}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="bg-blue-50 p-4 rounded-lg dark:bg-gray-700">
-                    <div className="flex items-start space-x-3">
-                      <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 dark:text-blue-400" />
-                      <div className="text-sm text-blue-800 dark:text-blue-200">
-                        <p className="font-medium mb-1">Important Notes:</p>
-                        <ul className="space-y-1">
-                          <li>
-                            • Consultation fee: ₹500 (payable after
-                            consultation)
-                          </li>
-                          <li>• Average wait time: 5-15 minutes</li>
-                          <li>• You can upload images during the chat</li>
-                          <li>
-                            • For emergencies, please call 9258924611 directly
-                          </li>
-                        </ul>
+                    <div className="bg-blue-50 p-4 rounded-lg dark:bg-gray-700">
+                      <div className="flex items-start space-x-3">
+                        <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 dark:text-blue-400" />
+                        <div className="text-sm text-blue-800 dark:text-blue-200">
+                          <p className="font-medium mb-1">Important Notes:</p>
+                          <ul className="space-y-1">
+                            <li>
+                              • Consultation fee: ₹500 (payable after
+                              consultation)
+                            </li>
+                            <li>• Average wait time: 5-15 minutes</li>
+                            <li>• You can upload images during the chat</li>
+                            <li>
+                              • For emergencies, please call 9258924611 directly
+                            </li>
+                          </ul>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full bg-blue-600 hover:bg-blue-700 shadow-lg"
-                    size="lg"
-                  >
-                    <MessageCircle className="h-5 w-5 mr-2" />
-                    Start Chat Consultation
-                  </Button>
-                </form>
+                    <Button
+                      type="submit"
+                      className="w-full bg-blue-600 hover:bg-blue-700 shadow-lg"
+                      size="lg"
+                    >
+                      <MessageCircle className="h-5 w-5 mr-2" />
+                      Start Chat Consultation
+                    </Button>
+                  </form>
+                )}
               </CardContent>
             </Card>
           </div>
