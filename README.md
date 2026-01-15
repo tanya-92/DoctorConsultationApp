@@ -83,7 +83,7 @@ A full-stack **Doctor Consultation Web Application** designed to manage online m
 ## 🌐 Deployment
 
 Deployed on Vercel
-[Deployed Link](practo-doctor-qsyp.vercel.app)
+[practo-doctor-qsyp.vercel.app](practo-doctor-qsyp.vercel.app)
 
 ---
 
